@@ -23,6 +23,22 @@ GROUPS = {
 	'funicular': ['FUNICULAR'],
 }
 PLACES = []
+
+
+def indoor_data(path):
+	"""Read only allowlisted, source-backed station map packages; no user data."""
+	base = ROOT / 'data/landsd/indoor'
+	if path == '/api/indoor/stations':
+		return json.loads((base / 'stations.json').read_text())
+	match = re.fullmatch(r'/api/indoor/stations/([a-f0-9-]{36})', path)
+	if not match:
+		raise KeyError(path)
+	index = json.loads((base / 'stations.json').read_text())
+	if match.group(1) not in {s['venue_id'] for s in index['stations']}:
+		raise KeyError(path)
+	return json.loads((base / 'stations' / (match.group(1) + '.json')).read_text())
+
+
 ROUTE_LOCK = threading.BoundedSemaphore(2)
 QUERY = '''query Route($origin:PlanLabeledLocationInput!,$destination:PlanLabeledLocationInput!,$date:PlanDateTimeInput,$modes:PlanModesInput,$prefs:PlanPreferencesInput){
  planConnection(origin:$origin,destination:$destination,dateTime:$date,modes:$modes,preferences:$prefs,first:30,searchWindow:"PT1H"){
@@ -105,6 +121,7 @@ def source_context():
 			railapitrips = api_proof.get('trips', {})
 			odtrips = api_proof.get('od_trips', {})
 			odjourneys = api_proof.get('od_journeys', {})
+		indoor = json.loads(z.read('indoor_provenance.json')) if 'indoor_provenance.json' in z.namelist() else {}
 		if 'transfers.txt' in z.namelist():
 			for r in csv.DictReader(
 				io.StringIO(z.read('transfers.txt').decode('utf-8-sig'))
@@ -148,6 +165,7 @@ def source_context():
 		'odtrips': odtrips,
 		'odjourneys': odjourneys,
 		'feedstops': feedstops,
+		'indoor': indoor,
 	}
 	return _SOURCE_CONTEXT
 
@@ -253,10 +271,16 @@ def leg_provenance(leg, previous_transit=None):
 		'warnings': [],
 	}
 	if not leg['transitLeg']:
+		indoor = context.get('indoor', {})
+		active = {sid for station in indoor.get('stations', []) if station['status'] in ('activated', 'partial') for sid in station.get('bindings', {})}
+		ends = [((leg.get(end) or {}).get('stop') or {}).get('gtfsId', '').split(':', 1)[-1] for end in ('from', 'to')]
+		uses_indoor = any(sid in active for sid in ends)
 		return {
 			'engine': 'OpenTripPlanner 2.9',
-			'sourceName': 'OpenStreetMap walking network',
+			'sourceName': 'OpenStreetMap + LandsD indoor pathways' if uses_indoor else 'OpenStreetMap walking network',
 			'sourceUrl': 'https://www.openstreetmap.org/copyright',
+			'indoorSourceUrl': 'https://data.gov.hk/en-data/dataset/hk-landsd-openmap-3d-indoor-network' if uses_indoor else None,
+			'indoorTimeModel': indoor.get('model') if uses_indoor else None,
 			'snapshot': snapshot_date('osm'),
 			'warnings': [
 				'Walking turn times are allocated from the whole walking-leg duration by distance; they are not separately measured.'
@@ -713,8 +737,10 @@ def normalize(itinerary):
 			leg['apiPath'] = []
 			leg['stopCalls'] = []
 			starttime = datetime.fromisoformat(leg['start']['scheduledTime'])
-			for sid, offset in zip(journey['stop_ids'], journey['seconds']):
-				stop = context['feedstops'][sid]
+			for index, (sid, offset) in enumerate(zip(journey['stop_ids'], journey['seconds'])):
+				endpoint = leg['from'] if index == 0 else leg['to'] if index == len(journey['stop_ids']) - 1 else None
+				physical = raw_gtfs_id((endpoint.get('stop') or {}).get('gtfsId')) if endpoint else None
+				stop = context['feedstops'].get(physical) or context['feedstops'][sid]
 				lat = float(stop['stop_lat'])
 				lon = float(stop['stop_lon'])
 				leg['apiPath'].append([lat, lon])
@@ -1080,6 +1106,11 @@ class Handler(BaseHTTPRequestHandler):
 		from urllib.parse import urlparse, parse_qs
 
 		url = urlparse(self.path)
+		if url.path.startswith('/api/indoor/'):
+			try:
+				return self.send_json(indoor_data(url.path))
+			except (KeyError, FileNotFoundError):
+				return self.send_json({'error': 'Indoor dataset not found'}, 404)
 		if url.path == '/api/optimization/example':
 			try:
 				count=int(parse_qs(url.query).get('count',['4'])[0])

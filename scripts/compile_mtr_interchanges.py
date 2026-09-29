@@ -69,6 +69,9 @@ def compile_interchanges(root, path):
 			)
 
 		trips = read('trips.txt')
+		routes = read('routes.txt')
+		byroute = {r['route_id']: r for r in routes}
+		journey_routes = {}
 		freq = read('frequencies.txt')
 		stops = read('stops.txt')
 		dates = read('calendar_dates.txt')
@@ -305,10 +308,20 @@ def compile_interchanges(root, path):
 						)
 					tid = f'MTRAPI:{ids[0]}:{ids[-1]}:{ri}:{wi}'
 					template = bytid[parent]
+					# These trips expose only two stops, hiding their internal path.
+					# OTP otherwise groups fast and slow paths with equal departures
+					# into one pattern and can discard the faster journey. Duration
+					# separates unequal paths while sharing equal-duration patterns.
+					route_id = f"{template['route_id']}:PATH:{total}"
+					if route_id not in journey_routes:
+						journey_routes[route_id] = dict(
+							byroute[template['route_id']], route_id=route_id
+						)
 					newtrips.append(
 						dict(
 							template,
 							trip_id=tid,
+							route_id=route_id,
 							service_id=services[ds],
 							trip_headsign=stopmap[stopids[-1]]['stop_name'],
 						)
@@ -358,21 +371,19 @@ def compile_interchanges(root, path):
 						len(newtrips),
 						flush=True,
 					)
-		# Forbid splitting a journey at the same station. The checker also
-		# limits MTR-only searches to one connection and rejects split MTR blocks.
-		# These restrictions are transit transfers, not access/egress walks.
-		hrstops = [s['stop_id'] for s in stops if s['stop_id'].startswith('RAIL:MTR:')]
+		# Do not expand synthetic MTR transfer bans across every pattern pair:
+		# that exhausts the supported 4 GB OTP heap. The paired routing API
+		# enforces whole journeys with has_split_mtr_journey and MTR-only
+		# maximumTransfers=0. Preserve unrelated/allowed transfer records.
 		transfers = [
 			r
 			for r in transfers
-			if not (r['from_stop_id'] in hrstops and r['to_stop_id'] in hrstops)
+			if not (
+				r.get('transfer_type') == '3'
+				and r['from_stop_id'].startswith('RAIL:MTR:')
+				and r['to_stop_id'].startswith('RAIL:MTR:')
+			)
 		]
-		transfers.extend(
-			dict(from_stop_id=a, to_stop_id=b, transfer_type='3', min_transfer_time='')
-			for a in hrstops
-			for b in hrstops
-			if a.split(':')[2] == b.split(':')[2]
-		)
 		proof.update(
 			od_connections=len(ods),
 			od_paths=len(journeys),
@@ -384,6 +395,7 @@ def compile_interchanges(root, path):
 		tmp = path.with_suffix('.journey.tmp')
 		with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as dest:
 			replaced = {
+				'routes.txt',
 				'trips.txt',
 				'stop_times.txt',
 				'frequencies.txt',
@@ -398,12 +410,16 @@ def compile_interchanges(root, path):
 					with z.open(name) as f, dest.open(name, 'w') as o:
 						shutil.copyfileobj(f, o)
 			for name, rows in [
+				('routes.txt', routes + list(journey_routes.values())),
 				('trips.txt', trips + newtrips),
 				('frequencies.txt', freq + newfreq),
 				('calendar_dates.txt', dates + newdates),
 				('transfers.txt', transfers),
 			]:
-				dest.writestr(name, encode(rows, list(rows[0])))
+				fields = list(rows[0]) if rows else [
+					'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time'
+				]
+				dest.writestr(name, encode(rows, fields))
 			with z.open('stop_times.txt') as f, dest.open('stop_times.txt', 'w') as o:
 				reader = csv.DictReader(io.TextIOWrapper(f, encoding='utf-8-sig'))
 				stream = io.TextIOWrapper(o, encoding='utf-8', newline='')

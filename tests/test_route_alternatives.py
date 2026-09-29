@@ -9,60 +9,68 @@ import server
 
 
 def node(route, duration, mode='BUS', walk=100, transfers=0):
-    return dict(duration=duration,walkDistance=walk,transfers=transfers,end='2026-09-26T09:00:00+08:00',
-                legs=[dict(mode=mode,transitLeg=True,route={'gtfsId':route},
-                           **{'from':{'lat':22.3,'lon':114.1},'to':{'lat':22.4,'lon':114.2}})])
+	return dict(duration=duration,walkDistance=walk,transfers=transfers,end='2026-09-26T09:00:00+08:00',
+				legs=[dict(mode=mode,transitLeg=True,route={'gtfsId':route},
+						**{'from':{'lat':22.3,'lon':114.1},'to':{'lat':22.4,'lon':114.2}})])
 
 class AlternativeTests(unittest.TestCase):
-    def run_search(self, extra=None, **kwargs):
-        data=dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr','bus'],preference='fastest')
-        data.update(extra or {})
-        calls=[]
-        def query(q,v,**options):
-            calls.append(copy.deepcopy(v))
-            modes={x['mode'] for x in v['modes']['transit']['transit']}
-            edges=[node('RAIL:MTR:TKL',3000,'SUBWAY')]
-            if modes=={'BUS','COACH'}:
-                edges=[node('BUS:790',3600,walk=30,transfers=0),node('BUS:790',3900,walk=30),node('BUS:971',4000,walk=20)]
-            return {'planConnection':dict(edges=[{'node':x} for x in edges],routingErrors=[])}
-        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-26T07:32:00+08:00')),patch.object(server,'graphql',side_effect=query),patch.object(server,'normalize',side_effect=lambda x:x),patch.object(server,'route_sources',return_value={}),patch.object(server,'separate_tram_filters',return_value=None):
-            result=server.plan(data,**kwargs)
-        return result,calls
+	def test_duration_patterns_keep_whole_mtr_journey_guard(self):
+		rail = dict(transitLeg=True,route=dict(gtfsId='1:RAIL:MTR:TKL:PATH:2220'))
+		walk = dict(transitLeg=False)
+		bus = dict(transitLeg=True,route=dict(gtfsId='1:BUS:790'))
+		self.assertTrue(server.has_split_mtr_journey(dict(legs=[rail,walk,rail])))
+		self.assertFalse(server.has_split_mtr_journey(dict(legs=[walk,rail,walk])))
+		self.assertFalse(server.has_split_mtr_journey(dict(legs=[rail,bus,rail])))
 
-    def test_extra_modes_are_returned_deduplicated_and_ranked(self):
-        result,calls=self.run_search()
-        self.assertEqual([x['duration'] for x in result['itineraries']],[3000,3600,4000])
-        self.assertEqual(len(calls),3)
-        self.assertEqual({m['mode'] for m in calls[-1]['modes']['transit']['transit']},{'BUS','COACH'})
-        self.assertEqual(result['maxResults'],6)
+	def run_search(self, extra=None, **kwargs):
+		data=dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr','bus'],preference='fastest')
+		data.update(extra or {})
+		calls=[]
+		def query(q,v,**options):
+			calls.append(copy.deepcopy(v))
+			modes={x['mode'] for x in v['modes']['transit']['transit']}
+			edges=[node('RAIL:MTR:TKL',3000,'SUBWAY')]
+			if modes=={'BUS','COACH'}:
+				edges=[node('BUS:790',3600,walk=30,transfers=0),node('BUS:790',3900,walk=30),node('BUS:971',4000,walk=20)]
+			return {'planConnection':dict(edges=[{'node':x} for x in edges],routingErrors=[])}
+		with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-26T07:32:00+08:00')),patch.object(server,'graphql',side_effect=query),patch.object(server,'normalize',side_effect=lambda x:x),patch.object(server,'route_sources',return_value={}),patch.object(server,'separate_tram_filters',return_value=None):
+			result=server.plan(data,**kwargs)
+		return result,calls
 
-    def test_toggle_and_worker_replay_skip_additional_searches(self):
-        for extra,kw in [({'includeAlternatives':False},{}),({'maxResults':1},{}),({}, {'for_optimization':'fast'})]:
-            result,calls=self.run_search(extra,**kw)
-            self.assertEqual(len(calls),2)
-            self.assertEqual(len(result['itineraries']),1)
+	def test_extra_modes_are_returned_deduplicated_and_ranked(self):
+		result,calls=self.run_search()
+		self.assertEqual([x['duration'] for x in result['itineraries']],[3000,3600,4000])
+		self.assertEqual(len(calls),3)
+		self.assertEqual({m['mode'] for m in calls[-1]['modes']['transit']['transit']},{'BUS','COACH'})
+		self.assertEqual(result['maxResults'],6)
 
-    def test_preference_still_ranks_all_routes(self):
-        result,_=self.run_search({'preference':'walking'})
-        self.assertEqual([x['walkDistance'] for x in result['itineraries']],[20,30,100])
+	def test_toggle_and_worker_replay_skip_additional_searches(self):
+		for extra,kw in [({'includeAlternatives':False},{}),({'maxResults':1},{}),({}, {'for_optimization':'fast'})]:
+			result,calls=self.run_search(extra,**kw)
+			self.assertEqual(len(calls),2)
+			self.assertEqual(len(result['itineraries']),1)
 
-    def test_unselected_transport_is_not_added(self):
-        result,calls=self.run_search({'modes':['mtr']})
-        self.assertEqual(len(calls),1)
-        self.assertEqual({m['mode'] for m in calls[0]['modes']['transit']['transit']},{'SUBWAY','RAIL'})
+	def test_preference_still_ranks_all_routes(self):
+		result,_=self.run_search({'preference':'walking'})
+		self.assertEqual([x['walkDistance'] for x in result['itineraries']],[20,30,100])
 
-    def test_invalid_options(self):
-        for value in [0,11,True,'6']:
-            with self.assertRaises(ValueError):self.run_search({'maxResults':value})
-        with self.assertRaises(ValueError):self.run_search({'includeAlternatives':'true'})
+	def test_unselected_transport_is_not_added(self):
+		result,calls=self.run_search({'modes':['mtr']})
+		self.assertEqual(len(calls),1)
+		self.assertEqual({m['mode'] for m in calls[0]['modes']['transit']['transit']},{'SUBWAY','RAIL'})
 
-    def test_failed_alternative_keeps_main_result(self):
-        original=server.graphql
-        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-26T07:32:00+08:00')),patch.object(server,'normalize',side_effect=lambda x:x),patch.object(server,'route_sources',return_value={}),patch.object(server,'separate_tram_filters',return_value=None):
-            response={'planConnection':dict(edges=[{'node':node('RAIL:MTR:TKL',3000,'SUBWAY')}],routingErrors=[])}
-            with patch.object(server,'graphql',side_effect=[copy.deepcopy(response),copy.deepcopy(response),TimeoutError()]):
-                result=server.plan(dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr','bus'],preference='fastest'))
-            self.assertEqual(len(result['itineraries']),1)
-            self.assertEqual(len(result['warnings']),1)
+	def test_invalid_options(self):
+		for value in [0,11,True,'6']:
+			with self.assertRaises(ValueError):self.run_search({'maxResults':value})
+		with self.assertRaises(ValueError):self.run_search({'includeAlternatives':'true'})
+
+	def test_failed_alternative_keeps_main_result(self):
+		original=server.graphql
+		with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-26T07:32:00+08:00')),patch.object(server,'normalize',side_effect=lambda x:x),patch.object(server,'route_sources',return_value={}),patch.object(server,'separate_tram_filters',return_value=None):
+			response={'planConnection':dict(edges=[{'node':node('RAIL:MTR:TKL',3000,'SUBWAY')}],routingErrors=[])}
+			with patch.object(server,'graphql',side_effect=[copy.deepcopy(response),copy.deepcopy(response),TimeoutError()]):
+				result=server.plan(dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr','bus'],preference='fastest'))
+			self.assertEqual(len(result['itineraries']),1)
+			self.assertEqual(len(result['warnings']),1)
 
 if __name__=='__main__':unittest.main()

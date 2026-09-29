@@ -1,5 +1,11 @@
 # LandsD data
 
+**Current workflow:** This document describes the conservative base enrichment
+stage. It is now followed by `scripts/indoor_network.py`, which adds validated
+station pathways and explicitly estimated walking times. Statements below about
+no pathways apply to the base stage only. See [INDOOR_ROUTING.md](INDOOR_ROUTING.md)
+for the complete current build and cross-validation policy.
+
 `python3 run.py build` now downloads, verifies and merges LandsD data before GTFS validation and the OTP graph build. Use `--offline` with a complete cache, or `--refresh` to request a new snapshot from all sources. Downloads resume from verified files and print station progress.
 
 For the LandsD stage alone:

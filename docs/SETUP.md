@@ -18,7 +18,7 @@ The sequence is:
 1. Verify/download government GTFS, OSM, route metadata, MTR station inventories and service hours.
 2. Discover bus/minibus wiki directories; compare candidates with GTFS; cache selected articles. Scrape rail wiki lines and all ordered pairs within each rail system.
 3. Parse source evidence and audit route identities; retain original data for ambiguous or unsupported cases.
-4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment.
+4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment → cross-validated indoor station pathways.
 5. Run the independent GTFS validator and rail merge checks, then build OTP once.
 6. Activate the successful feed and graph together; serve the Python API and HTML page.
 
@@ -48,6 +48,8 @@ python3 run.py
 
 Open `/` for the two-point checker or `/multi` for worker schedules. For a quick route check, choose LOHAS Park → HKU, **26 September 2026, 07:32**, and enable Show alternatives. The cached MTR rail journey via Tseung Kwan O and North Point is 37 minutes; access/egress and other options depend on the selected locations.
 
+Also check **29 September 2026, 11:00**. The fast 37-minute MTR journey must remain available when slower MTR paths depart at the same time. With the reference LOHAS Park/HKU coordinates in the regression script, this is about 50 minutes including walking and waiting. This is a cached timetable result, not a live arrival promise.
+
 Source-only tests (after dependencies are installed):
 
 ```sh
@@ -58,9 +60,30 @@ Live MTR checks for the September snapshot, with the server running:
 
 ```sh
 .venv/bin/python -m unittest discover -s route_checker -p test_mtr_od_live.py
+.venv/bin/python -B route_checker/check_mtr_routes.py --otp-port 8081
 ```
 
+The second check reads this checkout's feed and queries its running OTP directly; it does not create jobs or history. It checks every synthetic MTR trip's duration-separated route identity, weekday/weekend LOHAS Park–HKU, the reverse direction, three other station pairs, fastest ranking and bus alternatives. Dates default to the September snapshot; use `--weekday` and `--saturday` only with appropriate in-window dates and compatible cached operator timings.
+
+### Why the MTR build separates journey durations
+
+MTR connections in this experimental feed represent **complete cached origin/destination journeys**, including internal line changes. They expose just the boarding and alighting stops to OTP. They are not single through trains.
+
+Two paths with the same endpoints and departure time can have different durations. Sharing a GTFS route ID allowed OTP 2.9 to group them into one pattern and hide the faster path. `compile_mtr_interchanges.py` now assigns `:PATH:<duration-seconds>` route IDs while preserving the original public line name, departure bands, service dates, API timings and provenance. Equal-duration paths can still share a pattern. This is part of the normal source build, not a manual ZIP patch.
+
+Synthetic MTR-to-MTR forbidden-transfer rows are omitted: expanding them across the additional patterns exhausted the supported 4 GB OTP heap. The paired Python API still forbids consecutive synthetic MTR legs (`has_split_mtr_journey`) and limits dedicated MTR queries to one whole-journey connection. Other transfer records remain intact. **Use this feed through the paired routing API**; a generic OTP client bypassing that policy can combine synthetic journeys incorrectly.
+
+A separate earlier fix expands MTR's explicit non-peak Tseung Kwan O interchange note into a timetable-valid branch variant. Both fixes apply to all matching source records; neither hard-codes a preferred LOHAS Park–HKU result.
+
+When embedding this backend in another app, deploy the matching feed, OTP graph, build configuration, release manifest and routing adapter together, then restart that app's OTP process. Updating this checkout alone does not update a separately copied backend. Compare `gtfs_sha256` and `graph_sha256` in both release manifests to detect an old copy. Do not copy another app's authentication configuration or database.
+
 ## Cache and refresh
+
+The indoor stage retains the original 3D network FGDB, comparison GeoJSON, all
+98 station map datasets and their checksums. It preserves vertical lift paths,
+exports station map packages and records every withheld connection. Walking
+durations are model estimates. See [INDOOR_ROUTING.md](INDOOR_ROUTING.md) for
+source matching, build commands, output/API details and limitations.
 
 ```sh
 # Export raw source files; default output is dist/hk-routing-source-cache.tar.gz.

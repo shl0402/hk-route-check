@@ -61,6 +61,8 @@ CACHE_EXACT = {v[0] for v in SOURCES.values()} | {
 	f'{META}/lightRailDetails.json',
 	'data/source_manifest.json',
 	'data/landsd/raw/igeocom.zip',
+	'data/landsd/raw/indoor-network.zip',
+	'data/landsd/raw/indoor-network-fgdb.zip',
 }
 CACHE_PREFIX = (
 	'data/wiki_pilot/raw/',
@@ -410,6 +412,7 @@ def fetch(a):
 	script('scripts/scrape_mtr_api.py', '--root', ROOT, '--offline')
 	print('\n[Sources 4/4] LandsD places and station interiors (resumable)', flush=True)
 	script('scripts/landsd_enrich.py', 'fetch', '--root', ROOT, *flags)
+	script('scripts/indoor_network.py', 'fetch', '--root', ROOT, *flags)
 	for path, (url, sha) in TOOLS.items():
 		download(path, url, a.offline, checksum=sha)
 	print(
@@ -557,7 +560,7 @@ def build(a):
 
 	def validate():
 		shutil.copy2(
-			gen / 'hk-transit-LANDSD.gtfs.zip',
+			gen / 'hk-transit-INDOOR.gtfs.zip',
 			gen / 'hk-transit-EXPERIMENTAL.gtfs.zip',
 		)
 		script('scripts/validate_gtfs.py', root=work)
@@ -592,6 +595,7 @@ def build(a):
 			gen / 'hk-transit-MTR-API.gtfs.zip',
 		),
 		('08-landsd', lambda: script('scripts/landsd_enrich.py', 'merge', '--root', work, root=work), gen / 'hk-transit-LANDSD.gtfs.zip'),
+		('08b-indoor', lambda: script('scripts/indoor_network.py', 'compile', '--root', work, root=work), gen / 'hk-transit-INDOOR.gtfs.zip'),
 		('09-validate', validate, gen / 'validator/report.json'),
 		('10-otp-graph', graph_build, graph / 'graph.obj'),
 	]
@@ -650,6 +654,7 @@ def build(a):
 			shutil.copy2(work / 'data' / name, temp)
 			temp.replace(dest)
 	# The autocomplete index depends on the final feed and OSM snapshot.
+	shutil.copytree(work / 'data/landsd/indoor', ROOT / 'data/landsd/indoor', dirs_exist_ok=True)
 	(ROOT / 'route_checker/places.json').unlink(missing_ok=True)
 	manifest = {
 		'built_at': now(),
@@ -658,6 +663,7 @@ def build(a):
 		'gtfs_sha256': digest(live / 'hk-transit-EXPERIMENTAL.gtfs.zip'),
 		'graph_sha256': digest(live / 'otp-smoke/graph.obj'),
 		'validation_errors': 0,
+		'indoor_validation_sha256': digest(ROOT / 'data/landsd/indoor/validation.json'),
 		'source_manifest': read(ROOT / 'data/source_manifest.json'),
 	}
 	save(live / 'release-manifest.json', manifest)
@@ -676,6 +682,8 @@ def check_build():
 	]:
 		if digest(ROOT / 'data/generated' / path) != m[key]:
 			raise ValueError(f'Built artifact changed: {path}; rebuild before serving.')
+	if m.get('indoor_validation_sha256') and digest(ROOT / 'data/landsd/indoor/validation.json') != m['indoor_validation_sha256']:
+		raise ValueError('Indoor validation report does not match the active release')
 	print(
 		'Verified GTFS + OTP graph. Service dates:',
 		' to '.join(m['date_range']),
