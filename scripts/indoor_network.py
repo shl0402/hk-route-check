@@ -26,6 +26,7 @@ import zipfile
 import requests
 
 import landsd_enrich as landsd
+from indoor_timing import LIFT_WAIT_SECONDS
 
 
 NETWORK_URL = 'https://static.csdi.gov.hk/csdi-webpage/download/common/a381721a8e6956e7448bb63f5cc7f37d4cb1be0a42b8e4d94e414c6211ed27ce'
@@ -37,7 +38,7 @@ FGDB_RAW = 'data/landsd/raw/indoor-network-fgdb.zip'
 FGDB_META = 'data/landsd/raw/indoor-network-fgdb-manifest.json'
 OUTPUT = 'data/landsd/indoor'
 MODEL = {
-	'version': 2,
+	'version': 3,
 	'topology_horizontal_tolerance_m': 0.01,
 	'topology_vertical_tolerance_m': 0.005,
 	'landmark_horizontal_tolerance_m': 0.25,
@@ -45,7 +46,9 @@ MODEL = {
 	'stairs_m_s': 0.6,
 	'escalator_m_s': 0.5,
 	'lift_vertical_m_s': 1.0,
-	'lift_wait_seconds': 20,
+	'lift_wait_seconds': LIFT_WAIT_SECONDS,
+	'lift_wait_owner': 'OTP elevator.boardSlack; GTFS lift traversal_time contains movement only',
+	'same_level_lift_paths': 'Source lift geometry wholly on one level is walking access, not a separate lift ride',
 	'notes': 'Estimated movement time, excluding train waiting/boarding slack. Lift waiting is a fixed modelling assumption. Not a wheelchair route guarantee.',
 }
 LINE_NAMES = {
@@ -262,6 +265,11 @@ def make_graph(features):
 			continue
 		coords = [canonical[vertex(c)] for c in feature['geometry']['coordinates']]
 		mode = MODES[p['FeatureType']]
+		# LandsD also labels the short paths through lift doors/cabins as Lift.
+		# Without a height change these are walking access, not another boarding.
+		# Retain every source vertex and direction; add no inferred connection.
+		if mode == 5 and max(c[2] for c in coords) - min(c[2] for c in coords) <= MODEL['topology_vertical_tolerance_m']:
+			mode = 1
 		# A lift's intermediate geometry vertices are not additional floors.
 		# Keep one lift edge between its source endpoints, with one waiting cost.
 		if mode == 5:

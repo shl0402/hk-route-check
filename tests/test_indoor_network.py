@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import indoor_network as indoor
 from indoor_matching import choose_entrance, platform_codes, map_platform_codes, platform_evidence
+from indoor_timing import pathway_seconds, write_otp_config, LIFT_WAIT_SECONDS
 
 
 def segment(pid, a, b, **values):
@@ -17,6 +18,30 @@ def segment(pid, a, b, **values):
 
 
 class IndoorNetworkTests(unittest.TestCase):
+	def test_lift_wait_is_charged_once_by_otp_not_also_in_feed(self):
+		# Six metres vertically: six seconds moving plus one 20-second wait.
+		edges, _, _ = indoor.make_graph([segment(1, (114.2, 22.3, 0), (114.2, 22.3, 6), FeatureType=10)])
+		self.assertEqual(pathway_seconds(edges[0]), 6)
+		self.assertEqual(pathway_seconds(edges[0]) + LIFT_WAIT_SECONDS, edges[0]['seconds'])
+		self.assertEqual(pathway_seconds(dict(mode=1, seconds=26)), 26)
+		# OTP treats zero traversal_time as missing and substitutes a floor-hop
+		# estimate. Keep same-height source lift connectors at one second.
+		self.assertEqual(pathway_seconds(dict(mode=5, seconds=20)), 1)
+
+	def test_otp_build_and_runtime_share_wait_and_preserve_other_settings(self):
+		with tempfile.TemporaryDirectory() as folder:
+			graph = Path(folder)
+			(graph / 'build-config.json').write_text(json.dumps({'transitServiceStart': '2026-09-17'}))
+			(graph / 'router-config.json').write_text(json.dumps({'routingDefaults': {'walk': {'speed': 1.3}}}))
+			write_otp_config(graph)
+			build = json.loads((graph / 'build-config.json').read_text())
+			router = json.loads((graph / 'router-config.json').read_text())
+			self.assertEqual(build['transitServiceStart'], '2026-09-17')
+			self.assertEqual(router['routingDefaults']['walk']['speed'], 1.3)
+			self.assertEqual(build['transferRequests'][0]['modes'], 'WALK')
+			self.assertEqual(build['transferRequests'][0]['elevator']['boardSlack'], 'PT20S')
+			self.assertEqual(router['routingDefaults']['elevator'], build['transferRequests'][0]['elevator'])
+
 	def setUp(self):
 		self.a = (114.2, 22.3, 0)
 		self.b = (114.2001, 22.3, 0)
@@ -37,6 +62,18 @@ class IndoorNetworkTests(unittest.TestCase):
 		result = indoor.shortest(graph, self.a, self.c)
 		self.assertIsNotNone(result)
 		self.assertGreaterEqual(result[0], 26)
+
+	def test_same_floor_lift_approaches_are_not_extra_rides(self):
+		exit_point = (114.2002, 22.3, 6)
+		edges, graph, _ = indoor.make_graph([
+			segment(1, self.a, self.b, FeatureType=10),
+			segment(2, self.b, self.c, FeatureType=10),
+			segment(3, self.c, exit_point, FeatureType=10),
+		])
+		self.assertEqual([e['mode'] for e in edges], [1, 5, 1])
+		seconds, path = indoor.shortest(graph, self.a, exit_point)
+		self.assertEqual(sum(pathway_seconds(e) for e in path) + LIFT_WAIT_SECONDS, seconds)
+		self.assertEqual({e['source_id'] for e in path}, {1, 2, 3})
 
 	def test_escalator_direction_is_respected(self):
 		for direction, start, end in ((1, self.b, self.c), (-1, self.c, self.b)):

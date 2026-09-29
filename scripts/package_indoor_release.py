@@ -105,20 +105,29 @@ def package(root, target, output):
 		'data/generated/otp-smoke/hk.gtfs.zip',
 		'data/generated/otp-smoke/graph.obj',
 		'data/generated/otp-smoke/build-config.json',
+		'data/generated/otp-smoke/router-config.json',
+		'data/generated/otp-smoke/hong-kong.osm.pbf',
 		'data/generated/release-manifest.json',
 		'route_checker/server.py', 'route_checker/check_indoor_routes.py',
-		'route_checker/check_mtr_routes.py',
+		'route_checker/check_mtr_routes.py', 'route_checker/check_surface_routes.py',
 		'scripts/landsd_enrich.py', 'scripts/indoor_network.py', 'scripts/indoor_matching.py', 'scripts/indoor_routing.py', 'scripts/rebuild_indoor.py',
+		'scripts/indoor_timing.py',
+		'scripts/surface_timing.py', 'scripts/rebuild_surface.py', 'scripts/check_surface_feed.py',
+		'docs/SURFACE_TIMING.md', 'data/surface/report.json',
 		'data/mtr_api/inventory.json',
 		'docs/INDOOR_ROUTING.md', 'docs/INDOOR_VALIDATION.md', 'tools/gtfs-validator-8.0.1-cli.jar',
 	]
 	files += [p.relative_to(root).as_posix() for p in (root / 'data/mtr_api/raw').glob('HR_*.json')]
-	for prefix in ('data/landsd/raw', 'data/landsd/indoor'):
+	for prefix in ('data/landsd/raw', 'data/landsd/indoor', 'data/surface/raw'):
 		files += [p.relative_to(root).as_posix() for p in (root / prefix).rglob('*') if p.is_file() and not p.name.startswith('.') and not p.name.endswith('.part')]
 	for name in files:
 		p = payload / name
 		p.parent.mkdir(parents=True, exist_ok=True)
 		shutil.copy2(root / name, p)
+	surface_base = payload / 'data/surface-source/hk-transit-INDOOR.gtfs.zip'
+	surface_base.parent.mkdir(parents=True, exist_ok=True)
+	shutil.copy2(root / 'data/build-work/data/generated/hk-transit-INDOOR.gtfs.zip', surface_base)
+	(surface_base.parent / 'manifest.json').write_text(json.dumps(dict(sha256=digest(surface_base)), indent=2))
 	base = payload / 'data/indoor-source/hk-transit-LANDSD.gtfs.zip'
 	base.parent.mkdir(parents=True, exist_ok=True)
 	shutil.copy2(root / 'data/build-work/data/generated/hk-transit-LANDSD.gtfs.zip', base)

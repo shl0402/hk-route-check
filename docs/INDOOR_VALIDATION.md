@@ -1,4 +1,68 @@
-# Indoor routing validation — 29 September 2026, revision 2
+# Indoor routing validation
+
+## 30 September 2026: revision 3 — lift waiting
+
+The HKU report exposed an integration error that revision 2 did not test: OTP
+added its default 90-second lift boarding delay on top of the modelled wait
+already present in the feed. Four lift boardings added six minutes to HKU
+egress. The old tests bounded only LOHAS access, so their passing status did
+not establish sensible HKU walking times.
+
+Two of those four edges were same-floor lift-door/cabin access paths. They now
+retain their full geometry as walking access, with no lift boarding wait. The two
+height-changing lift rides remain. The fix exports lift movement time only and
+configures OTP to add one assumed 20-second wait per ride. Build-time transfers
+and runtime planning use matching settings.
+No street shortcut, missing passage or measured walking time is invented.
+The HKU C1 source heights are -15.43 m HKPD at the platform area and +58.85 m
+at the entrance: the indoor journey spans about 74 metres vertically. The flat
+map projection hides that height difference and draws indoor passages over streets.
+
+The standalone release now includes the OSM source PBF required for its rebuild,
+which was absent from the previous w8g bundle. See INDOOR_ROUTING.md for commands.
+
+### Verified revision 3 results
+
+- Exact reported journey: HKU egress **803 → 414 seconds** (13:23 → 6:54);
+  LOHAS access **393 → 303 seconds**; whole journey **3416 → 2937 seconds**
+  (56:56 → 48:57). The cached rail journey stays **2220 seconds / 37 minutes**.
+- HKU C1 has two height-changing lift rides; same-floor cabin/door access is walking.
+  The final 414 seconds comprise 334 seconds to C1 and about 80 seconds outdoors
+  to the selected station map point. These are model estimates, not stopwatch data.
+- **96 portable source tests** and **28 live routing cases** pass: all six HKU
+  entrances in both directions, three LOHAS/HKU cases, six platform-direction
+  cases, and seven MTR cases including bus alternatives.
+- Both rebuilds pass independent GTFS validation with zero errors. All 14 GTFS
+  text tables contain the same records across the full and standalone builds;
+  12 are byte-identical, while calendar exception/transfer row order differs.
+  Indoor reports agree except for the input ZIP hash. Train timetable fields
+  are unchanged from revision 2. The graph/ZIP container hashes can differ.
+- Coverage remains 93/98 stations. There are now **16,466 pathways**, retaining
+  the complete geometry of the same-floor source paths rather than collapsing
+  them as vertical lift edges.
+
+| HKU exit | Platform → exit | Exit → platform |
+|---|---:|---:|
+| A1 | 329 s | 329 s |
+| A2 | 374 s | 374 s |
+| B1 | 384 s | 390 s |
+| B2 | 379 s | 379 s |
+| C1 | 334 s | 334 s |
+| C2 | 478 s | 478 s |
+
+These live OTP checks use the published entrance coordinates, not the general
+HKU station search pin. Each result agrees with its directed source-model path
+plus two one-second binding edges. Repeat with:
+
+```sh
+.venv/bin/python route_checker/check_indoor_routes.py --otp-port 8081 --directions --hku-entrances
+.venv/bin/python route_checker/check_mtr_routes.py --otp-port 8081
+```
+
+Restart the engine after installing the matching feed, graph and configuration.
+Previously saved route snapshots retain their old estimates; make a new search.
+
+## Historical validation: 29 September 2026, revision 2
 
 This records the September source snapshot, not live arrivals or measured indoor
 walking times. See [INDOOR_ROUTING.md](INDOOR_ROUTING.md) for reproducible builds,

@@ -13,6 +13,9 @@ import sys
 
 import indoor_network
 import landsd_enrich
+import surface_timing
+from check_surface_feed import check
+from indoor_timing import write_otp_config
 
 
 def build(root, refresh=False):
@@ -24,6 +27,7 @@ def build(root, refresh=False):
 		landsd_enrich.fetch(root, refresh=True)
 		indoor_network.fetch(root, refresh=True)
 		indoor_network.fetch_original(root, refresh=True)
+		surface_timing.fetch(root, refresh=True)
 	work = root / 'data/indoor-rebuild'
 	shutil.copytree(root / 'data/landsd/raw', work / 'data/landsd/raw', dirs_exist_ok=True)
 	(work / 'data/mtr_api/raw').mkdir(parents=True, exist_ok=True)
@@ -35,7 +39,11 @@ def build(root, refresh=False):
 	feed = gen / 'hk-transit-EXPERIMENTAL.gtfs.zip'
 	refreshed_base = gen / 'hk-transit-LANDSD.gtfs.zip'
 	landsd_enrich.merge(work, base, refreshed_base)
-	indoor_network.compile_data(work, refreshed_base, feed)
+	indoor_feed = gen / 'hk-transit-INDOOR.gtfs.zip'
+	indoor_network.compile_data(work, refreshed_base, indoor_feed)
+	shutil.copytree(root / 'data/surface/raw', work / 'data/surface/raw', dirs_exist_ok=True)
+	surface_timing.merge(work, indoor_feed, feed)
+	check(indoor_feed, feed)
 	validator = root / 'tools/gtfs-validator-8.0.1-cli.jar'
 	if not validator.exists():
 		raise ValueError('Missing pinned validator JAR; restore it from the routing release')
@@ -52,12 +60,15 @@ def build(root, refresh=False):
 	shutil.copy2(feed, graph / 'hk.gtfs.zip')
 	for name in ('hong-kong.osm.pbf', 'build-config.json'):
 		shutil.copy2(root / 'data/generated/otp-smoke' / name, graph / name)
+	write_otp_config(graph)
 	jar = root / 'data/user_inputs/otp/otp-shaded-2.9.0.jar'
 	with (gen / 'otp-build.log').open('w') as log:
 		subprocess.run(['java', '-Xmx4G', '-jar', str(jar), '--build', '--save', str(graph)],
 			stdout=log, stderr=subprocess.STDOUT, check=True)
 	manifest = dict(base_feed_sha256=proof['sha256'], gtfs_sha256=landsd_enrich.sha(feed),
 		graph_sha256=landsd_enrich.sha(graph / 'graph.obj'), validation_errors=0,
+		router_config_sha256=landsd_enrich.sha(graph / 'router-config.json'),
+		build_config_sha256=landsd_enrich.sha(graph / 'build-config.json'),
 		indoor_validation_sha256=landsd_enrich.sha(work / 'data/landsd/indoor/validation.json'))
 	landsd_enrich.save(gen / 'candidate-manifest.json', manifest)
 	print('Validated candidate:', work)

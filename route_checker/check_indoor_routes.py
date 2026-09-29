@@ -15,6 +15,11 @@ import server
 def validate_feed(root):
 	with zipfile.ZipFile(root / 'data/generated/hk-transit-EXPERIMENTAL.gtfs.zip') as archive:
 		report = json.loads(archive.read('indoor_provenance.json'))
+		if report['model']['version'] >= 3:
+			for filename, section in (('router-config.json', 'routingDefaults'), ('build-config.json', 'transferRequests')):
+				config = json.loads((root / 'data/generated/otp-smoke' / filename).read_text())
+				requests = config[section] if section == 'transferRequests' else [config[section]]
+				assert requests and all(r['elevator']['boardSlack'] == f"PT{report['model']['lift_wait_seconds']}S" for r in requests), filename
 		stops = {s['stop_id']: s for s in csv.DictReader(io.StringIO(archive.read('stops.txt').decode()))}
 		paths = list(csv.DictReader(io.StringIO(archive.read('pathways.txt').decode())))
 		assert len(paths) == report['pathways']
@@ -97,11 +102,52 @@ def check(root, departure):
 		access = walks[-1] if reverse else walks[0]
 		assert access['distance'] < 650, (label, access)
 		assert access['duration'] < 720, (label, access)
+		# Revision 2 only bounded the LOHAS end, missing excessive HKU lift slack.
+		hku_walk = walks[0] if reverse else walks[-1]
+		assert hku_walk['duration'] < 600, (label, 'HKU access/egress too slow', hku_walk)
 		assert 'LandsD' in access['provenance']['sourceName'], access['provenance']
 		result = dict(case=label, access_metres=round(access['distance']),
-			access_minutes=round(access['duration'] / 60, 1), total_minutes=round(best['duration'] / 60, 1))
+			access_minutes=round(access['duration'] / 60, 1),
+			hku_minutes=round(hku_walk['duration'] / 60, 1), total_minutes=round(best['duration'] / 60, 1))
 		results.append(result)
 		print('PASS:', json.dumps(result), flush=True)
+	return results
+
+
+def check_hku_entrances(root, departure):
+	"""Compare live OTP legs at all six public exits with source network estimates.
+
+	Allow street snapping and binding overhead, but not another 90 seconds per lift.
+	Use public entrance coordinates, never a user's saved GPS history.
+	"""
+	report, stops = validate_feed(root)
+	hku = next(s for s in report['stations'] if s['name'] == 'HKU Station')
+	lohas = stops['LANDSD:ACCESS:556852']
+	origin = dict(lat=float(lohas['stop_lat']), lon=float(lohas['stop_lon']))
+	platform = next(s for s in hku['bindings'] if ':AREA:' in s)
+	results = []
+	for sid in sorted(s for s in hku['bindings'] if s.startswith('INDOOR:ACCESS:')):
+		stop = stops[sid]
+		point = dict(lat=float(stop['stop_lat']), lon=float(stop['stop_lon']))
+		for reverse in (False, True):
+			a, b = (sid, platform) if reverse else (platform, sid)
+			expected = next(c['estimated_seconds'] for c in hku['connections'] if c['from_stop_id'] == a and c['to_stop_id'] == b)
+			response = server.plan(dict(origin=point if reverse else origin,
+				destination=origin if reverse else point, departure=departure,
+				modes=['mtr'], preference='fastest', includeAlternatives=False))
+			candidates = [it for it in response['itineraries']
+				if any(l['transitLeg'] and l['duration'] == 2220 for l in it['legs'])]
+			assert candidates, (stop['stop_name'], reverse, 'No MTR journey')
+			best = min(candidates, key=lambda it: it['duration'])
+			walk = best['legs'][0 if reverse else -1]
+			assert walk['mode'] == 'WALK'
+			endpoint = walk['to' if reverse else 'from']['stop']['gtfsId']
+			assert server.raw_gtfs_id(endpoint) == platform, endpoint
+			assert walk['duration'] <= expected + 60, (stop['stop_name'], reverse, expected, walk)
+			result = dict(exit=stop['stop_name'], direction='enter' if reverse else 'exit',
+				model_seconds=expected, otp_seconds=walk['duration'])
+			results.append(result)
+			print('PASS:', json.dumps(result), flush=True)
 	return results
 
 
@@ -139,6 +185,7 @@ if __name__ == '__main__':
 	parser.add_argument('--departure', default='2026-09-29T11:00:00+08:00')
 	parser.add_argument('--feed-only', action='store_true')
 	parser.add_argument('--directions', action='store_true', help='Also check physical platforms in both directions')
+	parser.add_argument('--hku-entrances', action='store_true', help='Check all HKU entrance timings in both directions')
 	parser.add_argument('--base', type=Path, help='Also verify timetable preservation against the pre-indoor feed')
 	args = parser.parse_args()
 	server.ROOT = args.root.resolve()
@@ -151,3 +198,5 @@ if __name__ == '__main__':
 		check(server.ROOT, args.departure)
 		if args.directions:
 			check_directions(server.ROOT, args.departure)
+		if args.hku_entrances:
+			check_hku_entrances(server.ROOT, args.departure)

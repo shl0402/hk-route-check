@@ -139,3 +139,12 @@ OTP **2.9.0** and MobilityData validator **8.0.1** are downloaded from official 
 | `data/`, `tools/`, `.venv/` | Ignored local downloads, results and runtime |
 
 The older individual update scripts are retained for research/debugging. New users should use `run.py`; it establishes prerequisites in the correct order.
+
+## Bus/minibus travel times and map paths
+
+The build now estimates missing intermediate stop times using distances along
+validated CSDI bus/minibus paths, preserving published timing anchors. It also
+adds those paths to GTFS for road-following map display. Unmatched paths retain
+an explicitly labelled straight-line-distance fallback. These are timetable
+estimates, not live traffic predictions. Source research, limitations, offline
+reproduction and the standalone w8g rebuild are in [SURFACE_TIMING.md](SURFACE_TIMING.md).

@@ -5,6 +5,7 @@ import math
 import re
 import unicodedata
 from collections import defaultdict
+from indoor_timing import LIFT_WAIT_SECONDS
 
 
 def platform_codes(value):
@@ -134,7 +135,7 @@ def collapse_lift_splits(edges):
 			removed.update(e['id'] for e in chain)
 			combined = dict(edge, id='lift:' + ':'.join(sorted(e['id'] for e in chain)),
 				a=ends[0], b=ends[1], source_ids=sorted({e['source_id'] for e in chain}),
-				length=sum(e['length'] for e in chain), seconds=sum(e['seconds'] for e in chain) - 20 * (len(chain) - 1))
+				length=sum(e['length'] for e in chain), seconds=sum(e['seconds'] for e in chain) - LIFT_WAIT_SECONDS * (len(chain) - 1))
 			replacements.append(combined)
 	return [e for e in edges if e['id'] not in removed] + replacements
 

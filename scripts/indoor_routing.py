@@ -12,6 +12,7 @@ import zipfile
 from collections import defaultdict
 
 from indoor_matching import choose_entrance, platform_evidence, map_platform_codes
+from indoor_timing import pathway_seconds
 
 
 def compile_stations(root, archive, cache, dest, tables, by_floor, venues, report):
@@ -198,7 +199,7 @@ def compile_stations(root, archive, cache, dest, tables, by_floor, venues, repor
 			paths.append(dict(pathway_id='INDOOR:LINK:'+sid,from_stop_id=sid,to_stop_id=node_ids[c],pathway_mode='1',is_bidirectional='1',length='0',traversal_time='1'))
 		for edge in sorted(used.values(),key=lambda e:e['id']):
 			paths.append(dict(pathway_id='INDOOR:'+vid+':'+edge['id'],from_stop_id=node_ids[edge['a']],to_stop_id=node_ids[edge['b']],
-				pathway_mode=str(edge['mode']),is_bidirectional='1' if edge['both'] else '0',length=f"{n.horizontal(edge['a'],edge['b']):.3f}",traversal_time=str(edge['seconds'])))
+				pathway_mode=str(edge['mode']),is_bidirectional='1' if edge['both'] else '0',length=f"{n.horizontal(edge['a'],edge['b']):.3f}",traversal_time=str(pathway_seconds(edge))))
 		for context,pid in context_units.items():
 			if pid in connected_platforms:resolved[context]=pid
 		row.update(status='partial' if row['excluded_entrances'] or row['excluded_platforms'] else 'activated',

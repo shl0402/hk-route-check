@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-PATTERNS = ('test_setup.py', 'test_landsd.py', 'test_indoor_network.py', 'test_indoor_release.py', 'test_place_search.py',
+PATTERNS = ('test_surface_timing.py', 'test_setup.py', 'test_landsd.py', 'test_indoor_network.py', 'test_indoor_release.py', 'test_place_search.py',
             'test_optimizer.py', 'test_fast_mode.py', 'test_large_mode.py',
             'test_travel_cache_option.py', 'test_mtr_branch.py', 'test_route_alternatives.py')
 

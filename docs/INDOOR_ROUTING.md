@@ -102,6 +102,38 @@ boarding slack is separate. Live lift outages, crowds and reliable wheelchair
 navigation are not claimed. Only verified `stop_id` fields change in `stop_times.txt`;
 train times, trip IDs, frequencies and other timetable fields are preserved.
 
+### Lift timing integration (revision 3)
+
+OTP 2.9 independently charges `elevator.boardSlack` (default 90 seconds) when
+boarding a lift, even when the GTFS lift has `traversal_time`. Revision 2 included
+our 20-second wait in that field as well, so a route with four lift edges acquired
+six extra minutes. Source topology checks alone did not detect the engine default.
+
+The source also labels short horizontal paths through lift doors/cabins as lifts.
+If **all** geometry vertices are on the same level (within the existing 5 mm
+height tolerance), the importer keeps the complete path as walking access.
+Only height-changing lift geometry gets a lift boarding wait. The HKU C1 journey
+therefore has two actual lift rides, not four; no geometry or connection is invented.
+
+`scripts/indoor_timing.py` now defines one 20-second assumed wait. The source
+shortest-path report includes it; GTFS lift `traversal_time` contains movement
+only. OTP adds the wait once through `routingDefaults.elevator.boardSlack` in
+`router-config.json`. `transferRequests.elevator.boardSlack` in `build-config.json`
+uses the same setting for precomputed transfers. Both full and embedded rebuilds
+generate these files; portable releases include them. Keep the feed, graph and
+both configuration files together. No timing is subtracted after route selection.
+Same-height lift connectors retain a minimum one-second movement time because OTP
+treats zero as missing and would substitute its default floor-hop time instead.
+
+Reference: [OTP 2.9 elevator settings](https://docs.opentripplanner.org/en/v2.9.0/RouteRequest/)
+and the pinned JAR's `ElevatorBoardEdge` / `ElevatorHopEdge` traversal code.
+
+The HKU regression now checks both ends of the journey and all six HKU entrances
+in both directions. Indoor geometry is projected onto the outdoor map until the
+app implements floor controls; it must not be interpreted as a surface street loop.
+The search result named HKU is a station map point, not a guaranteed exit or a
+university building entrance. Select the intended destination/exit for that purpose.
+
 ## Outputs and APIs
 
 - `data/landsd/raw/`: original downloads, URLs, timestamps, sizes and hashes.
@@ -145,7 +177,8 @@ The installer checks candidate hashes and expected-old target hashes before
 changing anything, refuses running API/OTP ports and retains recoverable backups.
 It mounts the data endpoints inside w8g's existing authenticated GET handler.
 
-The embedded server receives the import/matching scripts, LandsD sources, cached MTR platform evidence and the exact
+The embedded server receives the import/matching scripts, the OSM source PBF,
+LandsD sources, cached MTR platform evidence and the exact
 pre-indoor base feed with its checksum. Within w8g:
 
 ```sh

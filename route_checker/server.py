@@ -121,6 +121,7 @@ def source_context():
 			railapitrips = api_proof.get('trips', {})
 			odtrips = api_proof.get('od_trips', {})
 			odjourneys = api_proof.get('od_journeys', {})
+		surface = json.loads(z.read('surface_timing_provenance.json')) if 'surface_timing_provenance.json' in z.namelist() else {}
 		indoor = json.loads(z.read('indoor_provenance.json')) if 'indoor_provenance.json' in z.namelist() else {}
 		if 'transfers.txt' in z.namelist():
 			for r in csv.DictReader(
@@ -166,6 +167,7 @@ def source_context():
 		'odjourneys': odjourneys,
 		'feedstops': feedstops,
 		'indoor': indoor,
+		'surface': surface,
 	}
 	return _SOURCE_CONTEXT
 
@@ -330,6 +332,20 @@ def leg_provenance(leg, previous_transit=None):
 				else 'No wiki override for this service.'
 			)
 		)
+	surface = context.get('surface', {})
+	pattern_id = surface.get('trips', {}).get(tripid)
+	if pattern_id:
+		surface_pattern = surface['patterns'][pattern_id]
+		item['surfaceTiming'] = {k: v for k, v in surface_pattern.items() if k not in ('stop_ids', 'distances_m')}
+		item['timingModelKind'] = surface_pattern['kind']
+		item['runningTimeSource'] = 'Published timing anchors with distance-weighted intermediate estimates'
+		item['intervalExplanation'] = 'Published timing points are preserved. Missing stop times are estimated in proportion to distance between those points; no live traffic adjustment.'
+		item['warnings'].append('Intermediate travel times are estimates, not measured or live bus timings.')
+		if surface_pattern['kind'] == 'csdi_route_distance':
+			item['geometrySource'] = 'Hong Kong Transport Department / CSDI route path'
+			item['geometrySourceUrl'] = surface['source_manifest'][surface_pattern['source']]['metadata_url']
+		else:
+			item['warnings'].append(surface_pattern['warning'])
 	if rw:
 		item.update(
 			sourceName='Hong Kong Railway Wiki timetable + experimental rail running times',
