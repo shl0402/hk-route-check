@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from transit_identity import enrich_leg
+from mtr_sections import rail_sections
 import route_selection
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -824,6 +825,10 @@ def normalize(itinerary, requested_departure=None):
 		leg['estimatedRail'] = bool(
 			leg.get('route') and ':RAIL:' in leg['route']['gtfsId']
 		)
+		if od:
+			sections = rail_sections(leg, journey)
+			if sections:
+				leg['railSections'] = sections
 	duration = max(0, round(itinerary['duration']))
 	requested = requested_departure or itinerary['start']
 	start_wait = max(0, round(timestamp(itinerary['start']) - timestamp(requested)))

@@ -1,0 +1,381 @@
+{
+  "journey": {
+    "seconds": [
+      0,
+      420,
+      540,
+      720,
+      960,
+      1080,
+      1320,
+      1440,
+      1560,
+      1680,
+      1800,
+      2100
+    ],
+    "api_total_seconds": 2100,
+    "path": [
+      "57",
+      "50",
+      "49",
+      "48",
+      "32",
+      "31",
+      "30",
+      "29",
+      "28",
+      "27",
+      "2",
+      "3"
+    ],
+    "stop_ids": [
+      "RAIL:MTR:57:TKL",
+      "RAIL:MTR:50:TKL",
+      "RAIL:MTR:49:TKL",
+      "RAIL:MTR:48:TKL",
+      "RAIL:MTR:32:TKL",
+      "RAIL:MTR:31:ISL",
+      "RAIL:MTR:30:ISL",
+      "RAIL:MTR:29:ISL",
+      "RAIL:MTR:28:ISL",
+      "RAIL:MTR:27:ISL",
+      "RAIL:MTR:2:TWL",
+      "RAIL:MTR:3:TWL"
+    ],
+    "line": "TKL → TKL → ISL → TWL",
+    "url": "https://www.mtr.com.hk/share/customer/jp/api/HRRoutes/?o=57&d=3&lang=E",
+    "fetched_at": "2026-09-21T09:52:35.681985+00:00",
+    "interchanges": [
+      {
+        "station_id": "50",
+        "stop_id": "RAIL:MTR:50:TKL",
+        "line": "TKL",
+        "platform": "2",
+        "instruction": "During non-peak hours, please interchange at Tseung Kwan O for trains towards North Point.",
+        "seconds": 420
+      },
+      {
+        "station_id": "31",
+        "stop_id": "RAIL:MTR:31:ISL",
+        "line": "ISL",
+        "platform": "2",
+        "instruction": "Interchange at North Point Platform 2 towards Kennedy Town",
+        "seconds": 1080
+      },
+      {
+        "station_id": "2",
+        "stop_id": "RAIL:MTR:2:TWL",
+        "line": "TWL",
+        "platform": "1",
+        "instruction": "Interchange at Admiralty Platform 1 towards Tsuen Wan",
+        "seconds": 1800
+      }
+    ],
+    "internal_transfers": 3,
+    "instructions": [
+      {
+        "station_id": "57",
+        "stop_id": "RAIL:MTR:57:TKL",
+        "seconds": 0,
+        "text": "Board at LOHAS Park Platform 1 or 2 towards Tseung Kwan O"
+      },
+      {
+        "station_id": "50",
+        "stop_id": "RAIL:MTR:50:TKL",
+        "seconds": 420,
+        "text": "During non-peak hours, please interchange at Tseung Kwan O for trains towards North Point."
+      },
+      {
+        "station_id": "31",
+        "stop_id": "RAIL:MTR:31:ISL",
+        "seconds": 1080,
+        "text": "Interchange at North Point Platform 2 towards Kennedy Town"
+      },
+      {
+        "station_id": "2",
+        "stop_id": "RAIL:MTR:2:TWL",
+        "seconds": 1800,
+        "text": "Interchange at Admiralty Platform 1 towards Tsuen Wan"
+      }
+    ],
+    "semantics": "Whole cached platform-to-platform journey including internal changes; no added internal OTP wait.",
+    "messages": [
+      {
+        "msg": "<span style=\"color:#000000; font-family:-apple-system; font-size:15\">During non-peak hours, please interchange at Tseung Kwan O for trains towards North Point. </span>",
+        "banner": 7,
+        "bgColor": "fcebb7",
+        "url": null,
+        "urlm": null,
+        "fontSize": 15,
+        "fontColor": "000000",
+        "msgText": "During non-peak hours, please interchange at Tseung Kwan O for trains towards North Point. "
+      }
+    ],
+    "timetable_variant": "TKO same-line change from MTR service note"
+  },
+  "leg": {
+    "mode": "SUBWAY",
+    "transitLeg": true,
+    "duration": 2100,
+    "distance": 12345,
+    "route": {
+      "gtfsId": "1:RAIL:MTR:JOURNEY:test",
+      "shortName": "TKL → TKL → ISL → TWL"
+    },
+    "start": {
+      "scheduledTime": "2026-10-01T09:47:00+08:00"
+    },
+    "end": {
+      "scheduledTime": "2026-10-01T10:22:00+08:00"
+    },
+    "stopCalls": [
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:57:TKL",
+          "name": "LOHAS Park (TKL)",
+          "lat": 22.295251,
+          "lon": 114.270387
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T09:47:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:50:TKL",
+          "name": "Tseung Kwan O (TKL)",
+          "lat": 22.307709,
+          "lon": 114.26013
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T09:54:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:49:TKL",
+          "name": "Tiu Keng Leng (TKL)",
+          "lat": 22.304225,
+          "lon": 114.252389
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T09:56:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:48:TKL",
+          "name": "Yau Tong (TKL)",
+          "lat": 22.29809,
+          "lon": 114.237063
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T09:59:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:32:TKL",
+          "name": "Quarry Bay (TKL)",
+          "lat": 22.289583,
+          "lon": 114.208235
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:03:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:31:ISL",
+          "name": "North Point (ISL)",
+          "lat": 22.291469,
+          "lon": 114.200488
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:05:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:30:ISL",
+          "name": "Fortress Hill (ISL)",
+          "lat": 22.288411,
+          "lon": 114.193708
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:09:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:29:ISL",
+          "name": "Tin Hau (ISL)",
+          "lat": 22.282663,
+          "lon": 114.191777
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:11:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:28:ISL",
+          "name": "Causeway Bay (ISL)",
+          "lat": 22.2797,
+          "lon": 114.183429
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:13:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:27:ISL",
+          "name": "Wan Chai (ISL)",
+          "lat": 22.277441,
+          "lon": 114.172207
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:15:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:2:TWL",
+          "name": "Admiralty (TWL)",
+          "lat": 22.278752,
+          "lon": 114.164826
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:17:00+08:00"
+          }
+        }
+      },
+      {
+        "stopLocation": {
+          "gtfsId": "RAIL:MTR:3:TWL",
+          "name": "Tsim Sha Tsui (TWL)",
+          "lat": 22.297048,
+          "lon": 114.173688
+        },
+        "schedule": {
+          "time": {
+            "arrival": "2026-10-01T10:22:00+08:00"
+          }
+        }
+      }
+    ],
+    "apiPath": [
+      [
+        22.295251,
+        114.270387
+      ],
+      [
+        22.307709,
+        114.26013
+      ],
+      [
+        22.304225,
+        114.252389
+      ],
+      [
+        22.29809,
+        114.237063
+      ],
+      [
+        22.289583,
+        114.208235
+      ],
+      [
+        22.291469,
+        114.200488
+      ],
+      [
+        22.288411,
+        114.193708
+      ],
+      [
+        22.282663,
+        114.191777
+      ],
+      [
+        22.2797,
+        114.183429
+      ],
+      [
+        22.277441,
+        114.172207
+      ],
+      [
+        22.278752,
+        114.164826
+      ],
+      [
+        22.297048,
+        114.173688
+      ]
+    ],
+    "internalTransfers": 3,
+    "journeyInstructions": [
+      {
+        "station_id": "57",
+        "stop_id": "RAIL:MTR:57:TKL",
+        "seconds": 0,
+        "text": "Board at LOHAS Park Platform 1 or 2 towards Tseung Kwan O"
+      },
+      {
+        "station_id": "50",
+        "stop_id": "RAIL:MTR:50:TKL",
+        "seconds": 420,
+        "text": "During non-peak hours, please interchange at Tseung Kwan O for trains towards North Point."
+      },
+      {
+        "station_id": "31",
+        "stop_id": "RAIL:MTR:31:ISL",
+        "seconds": 1080,
+        "text": "Interchange at North Point Platform 2 towards Kennedy Town"
+      },
+      {
+        "station_id": "2",
+        "stop_id": "RAIL:MTR:2:TWL",
+        "seconds": 1800,
+        "text": "Interchange at Admiralty Platform 1 towards Tsuen Wan"
+      }
+    ],
+    "waitBeforeSeconds": 60,
+    "from": {
+      "gtfsId": "RAIL:MTR:57:TKL",
+      "name": "LOHAS Park (TKL)",
+      "lat": 22.295251,
+      "lon": 114.270387
+    },
+    "to": {
+      "gtfsId": "RAIL:MTR:3:TWL",
+      "name": "Tsim Sha Tsui (TWL)",
+      "lat": 22.297048,
+      "lon": 114.173688
+    }
+  }
+}

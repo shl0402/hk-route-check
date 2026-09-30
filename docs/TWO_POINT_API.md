@@ -16,6 +16,25 @@ Start the app with `python3 run.py`, then send JSON to `POST /api/route`:
 
 Use a departure date within your built GTFS calendar. Preferences: `fastest`, `transfers`, `walking`.
 
+## MTR line sections
+
+An MTR `legs[]` entry may represent a complete operator-timed journey, including
+interchanges. For display, use its optional `railSections[]` instead of drawing
+the whole connection in its first line's colour. Each section has its own route
+name/colour, endpoints, `stopCalls`, `apiPath`, start/end and duration. Adjacent
+sections share the interchange station. Same-line train changes also split.
+
+Section offsets come from cached MTR cumulative path times; their durations sum
+to the parent leg duration and already include internal interchange time. Do not
+add another wait or sum parent and child durations. Routing costs, parent
+`internalTransfers` and the timetable are unchanged. The native app uses sections
+for the flow, stop timeline and map, and can reconstruct older saved sections
+from retained line suffixes and timed interchange instructions.
+
+This is an API/presentation change: restart the server after updating the Python
+files; no feed/graph rebuild is required. Reproduce the regression with
+`python3 -m unittest discover -s tests -p test_mtr_sections.py -v`.
+
 ## Alternatives
 
 1. Search the selected transport. A separate MTR search preserves complete station-pair journeys.
