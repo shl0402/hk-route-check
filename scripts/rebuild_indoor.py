@@ -14,6 +14,8 @@ import sys
 import indoor_network
 import landsd_enrich
 import surface_timing
+import operator_sources
+import operator_timing
 from check_surface_feed import check
 from indoor_timing import write_otp_config
 
@@ -28,6 +30,7 @@ def build(root, refresh=False):
 		indoor_network.fetch(root, refresh=True)
 		indoor_network.fetch_original(root, refresh=True)
 		surface_timing.fetch(root, refresh=True)
+	operator_sources.fetch(root, offline=not refresh, refresh=refresh)
 	work = root / 'data/indoor-rebuild'
 	shutil.copytree(root / 'data/landsd/raw', work / 'data/landsd/raw', dirs_exist_ok=True)
 	(work / 'data/mtr_api/raw').mkdir(parents=True, exist_ok=True)
@@ -42,8 +45,11 @@ def build(root, refresh=False):
 	indoor_feed = gen / 'hk-transit-INDOOR.gtfs.zip'
 	indoor_network.compile_data(work, refreshed_base, indoor_feed)
 	shutil.copytree(root / 'data/surface/raw', work / 'data/surface/raw', dirs_exist_ok=True)
-	surface_timing.merge(work, indoor_feed, feed)
-	check(indoor_feed, feed)
+	shutil.copytree(root / 'data/operators/raw', work / 'data/operators/raw', dirs_exist_ok=True)
+	surface_feed = gen / 'hk-transit-SURFACE.gtfs.zip'
+	surface_timing.merge(work, indoor_feed, surface_feed)
+	check(indoor_feed, surface_feed)
+	operator_timing.merge(work, surface_feed, feed)
 	validator = root / 'tools/gtfs-validator-8.0.1-cli.jar'
 	if not validator.exists():
 		raise ValueError('Missing pinned validator JAR; restore it from the routing release')

@@ -25,7 +25,7 @@ def leg(start, end, transit):
 
 
 class TimingTests(unittest.TestCase):
-	def test_only_first_wait_removed(self):
+	def test_all_boarding_waits_included(self):
 		it = dict(
 			start='2026-09-17T10:00:00+08:00',
 			duration=1800,
@@ -36,9 +36,10 @@ class TimingTests(unittest.TestCase):
 			],
 		)
 		r = server.normalize(it)
-		self.assertEqual(r['initialWaitExcludedSeconds'], 300)
+		self.assertEqual(r['initialWaitExcludedSeconds'], 0)
+		self.assertEqual(r['initialWaitSeconds'], 300)
 		self.assertEqual(r['transferWaitSeconds'], 300)
-		self.assertEqual(r['displayDurationSeconds'], 1500)
+		self.assertEqual(r['displayDurationSeconds'], 1800)
 		self.assertEqual(r['transfers'], 1)
 
 	def test_split_mtr_journeys_are_rejected(self):
@@ -103,7 +104,7 @@ class LiveTests(unittest.TestCase):
 				all(l['mode'] in ['WALK', 'SUBWAY', 'RAIL'] for l in it['legs'])
 			)
 			self.assertEqual(
-				it['duration'] - it['initialWaitExcludedSeconds'],
+				it['duration'] + it['originWaitSeconds'],
 				it['displayDurationSeconds'],
 			)
 
@@ -147,10 +148,11 @@ class LiveTests(unittest.TestCase):
 		self.assertGreater(rail[0].get('internalTransfers', 0), 0)
 		self.assertEqual(it['transfers'], 0)
 		self.assertEqual(it['transferWaitSeconds'], 0)
-		self.assertGreater(it['initialWaitExcludedSeconds'], 0)
+		self.assertEqual(it['initialWaitExcludedSeconds'], 0)
+		self.assertGreater(it['initialWaitSeconds'], 0)
 		self.assertEqual(
 			it['displayDurationSeconds'],
-			it['duration'] - it['initialWaitExcludedSeconds'],
+			it['duration'] + it['originWaitSeconds'],
 		)
 
 	def test_isl_source_is_not_claimed_as_live_wait(self):

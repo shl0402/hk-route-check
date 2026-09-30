@@ -15,6 +15,14 @@ from r5_matrix import R5Matrix
 from test_optimizer import Router,request
 
 class CacheOptionTests(unittest.TestCase):
+    def test_worker_schedule_does_not_certify_a_missing_access_walk(self):
+        with tempfile.TemporaryDirectory() as folder:
+            c=opt.TravelCache.__new__(opt.TravelCache);c.path=Path(folder)/'pairs.sqlite3';c.version='test'
+            with sqlite3.connect(c.path) as db:db.execute('CREATE TABLE pairs (key TEXT PRIMARY KEY,value TEXT NOT NULL)')
+            c.router=SimpleNamespace(plan=Mock(return_value={'itineraries':[{'end':60,'hasUnverifiedAccess':True}]}),timestamp=float)
+            value,_=c.route({'lat':22.3,'lon':114.1},{'lat':22.4,'lon':114.2},datetime.fromtimestamp(0,Router.HK),['mtr'])
+            self.assertIsNone(value['seconds'])
+
     def test_boolean_validation(self):
         self.assertTrue(opt.validate(request(),Router)['useTravelCache'])
         self.assertFalse(opt.validate(dict(request(),useTravelCache=False),Router)['useTravelCache'])

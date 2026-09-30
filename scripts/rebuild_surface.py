@@ -10,6 +10,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import surface_timing
+import operator_sources
+import operator_timing
 from check_surface_feed import check
 
 
@@ -19,13 +21,17 @@ def build(root, refresh=False):
 	if surface_timing.sha(base) != proof['sha256']:
 		raise ValueError('Bundled pre-surface GTFS does not match manifest')
 	surface_timing.fetch(root, offline=not refresh, refresh=refresh)
+	operator_sources.fetch(root, offline=not refresh, refresh=refresh)
 	work = root / 'data/surface-rebuild'
 	shutil.copytree(root / 'data/surface/raw', work / 'data/surface/raw', dirs_exist_ok=True)
+	shutil.copytree(root / 'data/operators/raw', work / 'data/operators/raw', dirs_exist_ok=True)
 	gen = work / 'data/generated'
 	gen.mkdir(parents=True, exist_ok=True)
 	feed = gen / 'hk-transit-EXPERIMENTAL.gtfs.zip'
-	surface_timing.merge(work, base, feed)
-	check(base, feed)
+	surface_feed = gen / 'hk-transit-SURFACE.gtfs.zip'
+	surface_timing.merge(work, base, surface_feed)
+	check(base, surface_feed)
+	operator_timing.merge(work, surface_feed, feed)
 	validator = root / 'tools/gtfs-validator-8.0.1-cli.jar'
 	with (gen / 'validator.log').open('w') as log:
 		subprocess.run(['java', '-Xmx3G', '-jar', str(validator), '-i', str(feed),

@@ -687,15 +687,15 @@
 				>
 				<label for="preference" style="margin-top: 14px">Route preference</label
 				><select id="preference">
-					<option value="fastest">Fastest journey</option>
+					<option value="fastest">Arrive soonest</option>
 					<option value="transfers">Fewer transfers</option>
 					<option value="walking">Less walking</option>
 				</select>
 				<label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="include-alternatives" type="checkbox" checked style="width:auto"> Show alternatives</label>
 				<small>Up to 6 routes using your selected transport, ordered by your preference. Adds search time.</small>
 				<div class="rule">
-					First boarding wait is excluded from the displayed duration.
-					Transfer waits are included. Scheduled clock times stay unchanged.
+					Total time starts at your requested departure and includes all waits.
+					The suggested leaving and arrival times are shown separately.
 				</div>
 				<button class="primary" id="find">Find routes →</button>
 				<div id="status" class="status" role="status" aria-live="polite">
@@ -1131,7 +1131,7 @@
 							? "Railway Wiki"
 							: rail
 								? "MTR + model"
-								: "Government GTFS";
+								: type === "operator" ? "Sun Ferry" : "Government GTFS";
 				const intervals = [
 					...new Set(
 						(p.feedIntervals || []).map((r) => r.headwaySeconds / 60),
@@ -1150,6 +1150,9 @@
 					: walk
 						? "Walking time estimated."
 						: "<b>Timing:</b> listed departures";
+				const corroboration = p.corroboratingUrl
+					? "<br>Checked against " + sourceLink(p.corroboratingUrl, "Citybus timetable")
+					: "";
 				const apiCount = (p.runningTimeSegments || []).filter((s) =>
 						["OPERATOR_DERIVED_estimate", "MTR_API_CUMULATIVE"].includes(
 							s.kind,
@@ -1179,7 +1182,7 @@
 					? ""
 					: rail
 						? "Stops: MTR data · transfer buffer: estimate."
-						: "Stops & ride times: government GTFS; intermediate times may be estimated.";
+						: type === "operator" ? p.runningTimeSource : "Stops & ride times: government GTFS; intermediate times may be estimated.";
 				const status =
 					p.wikiStatus || (type === "wiki" ? "Wiki timetable applied." : "");
 				const freshness =
@@ -1192,7 +1195,7 @@
 					type === "experimental_rail"
 						? "Interval: conservative model, may overstate daytime waits."
 						: "";
-				return `<details class="provenance"><summary>Sources & estimates</summary><p><b>${walk ? "Map" : "Timetable"}:</b> ${sourceLink(p.sourceUrl, name)}<br>${timing}${rail ? "<br><b>Ride times:</b> " + rideSource : ""}${basis ? "<br>" + esc(basis) : ""}${p.boardingPlatform ? "<br><b>Platform:</b> " + esc(Array.isArray(p.boardingPlatform) ? p.boardingPlatform.join(" / ") : p.boardingPlatform) : ""}</p>${status ? "<p>" + esc(status) + "</p>" : ""}${freshness || fallback ? "<p>" + esc([freshness, fallback].filter(Boolean).join(" ")) + "</p>" : ""}${walk ? "" : '<p class="muted">Waits are modelled, not live arrivals.</p>'}${detailedSourceHtml(p).replace("Data source & timing assumptions", "More details")}</details>`;
+				return `<details class="provenance"><summary>Sources & estimates</summary><p><b>${walk ? "Map" : "Timetable"}:</b> ${sourceLink(p.sourceUrl, name)}<br>${timing}${corroboration}${rail ? "<br><b>Ride times:</b> " + rideSource : ""}${basis ? "<br>" + esc(basis) : ""}${p.boardingPlatform ? "<br><b>Platform:</b> " + esc(Array.isArray(p.boardingPlatform) ? p.boardingPlatform.join(" / ") : p.boardingPlatform) : ""}</p>${status ? "<p>" + esc(status) + "</p>" : ""}${freshness || fallback ? "<p>" + esc([freshness, fallback].filter(Boolean).join(" ")) + "</p>" : ""}${walk ? "" : '<p class="muted">Waits are modelled, not live arrivals.</p>'}${detailedSourceHtml(p).replace("Data source & timing assumptions", "More details")}</details>`;
 			}
 			function detailedOverallSources(s) {
 				if (!s)
@@ -1201,7 +1204,7 @@
 			}
 			function overallSources(s) {
 				if (!s) return "<p>Sources unavailable.</p>";
-				return `<details class="provenance"><summary>Route sources</summary><p>Timetables: government / MTR / selected wiki updates.<br>Walking map: OpenStreetMap · routing: OTP.<br>First wait excluded; transfer waits included. No live arrivals.</p>${detailedOverallSources(s).replace("Where these route suggestions come from", "More details")}</details>`;
+				return `<details class="provenance"><summary>Route sources</summary><p>Timetables: government / MTR / selected wiki updates.<br>Walking map: OpenStreetMap · routing: OTP.<br>All waits included from your requested departure. No live arrivals.</p>${detailedOverallSources(s).replace("Where these route suggestions come from", "More details")}</details>`;
 			}
 			function draftMessage() {
 				return routes.length
@@ -1219,7 +1222,7 @@
 						["listed_departure", "published_departure_list"].includes(
 							l.provenance?.timingKind,
 						));
-				const label = l.initialWaitExcluded
+				const label = l.firstBoarding
 					? "First boarding wait"
 					: "Transfer wait / boarding buffer";
 				const date = l.start?.scheduledTime;
@@ -1227,7 +1230,7 @@
 					listed && date
 						? `<br><b>${l.boardingAtOrigin === true ? "Listed departure" : "Estimated departure here"}: ${timeOf(date)}</b><br><small>${l.boardingAtOrigin === true ? "Timetable · not live" : "Based on listed departure + estimated travel time · not live"}</small>`
 						: "";
-				return `${label}${listed ? "" : " (model)"} · <b>${mins(l.waitBeforeSeconds)}</b>${departure}<br><small>${l.initialWaitExcluded ? "Excluded from displayed total." : "Included in displayed total."} At ${esc(l.from.name)}.</small>${l.provenance?.warnings?.some((x) => x.includes("overstates normal daytime")) ? '<p class="source-warning">All-day maximum interval; daytime waits may be overstated.</p>' : ""}`;
+				return `${label}${listed ? "" : " (model)"} · <b>${mins(l.waitBeforeSeconds)}</b>${departure}<br><small>Included in total. At ${esc(l.from.name)}.</small>${l.provenance?.warnings?.some((x) => x.includes("overstates normal daytime")) ? '<p class="source-warning">All-day maximum interval; daytime waits may be overstated.</p>' : ""}`;
 			}
 			const flowLines = {
 				TWL: ["Tsuen Wan", "#b82f35"],
@@ -1253,10 +1256,11 @@
 			}
 			function journeyFlow(it) {
 				const steps = [];
+				if (it.originWaitSeconds > 0) steps.push(`<span class="flow-wait" role="listitem" title="Suggested leaving time; the time before this is not waiting at the stop">${flowIcon("wait")}<span>Leave ${esc(timeOf(it.start))}</span></span>`);
 				const chip = (icon, text, label, index, style = "") =>
 					`<button type="button" class="flow-chip" data-flow-leg="${index}" aria-label="${esc(label)}" title="${esc(label)}"${style ? ` style="${style}"` : ""}>${flowIcon(icon)}<span>${esc(text)}</span></button>`;
 				it.legs.forEach((l, index) => {
-					if (l.waitBeforeSeconds > 0 && !l.initialWaitExcluded)
+					if (l.waitBeforeSeconds > 0)
 						steps.push(
 							`<span class="flow-wait" role="listitem" title="Additional waiting / boarding buffer" aria-label="Wait ${esc(mins(l.waitBeforeSeconds))}">${flowIcon("wait")}<span>${esc(mins(l.waitBeforeSeconds))}</span></span>`,
 						);
@@ -1324,7 +1328,7 @@
 					.querySelectorAll("[data-route]")
 					.forEach((el) => (el.onclick = () => render(+el.dataset.route)));
 				$("route-summary").innerHTML =
-					`<div class="summary"><div class="big">${mins(it.displayDurationSeconds)}</div><small>excluding ${mins(it.initialWaitExcludedSeconds)} first boarding wait</small>${journeyFlow(it)}</div><div class="times">Scheduled journey: <b>${timeOf(it.start)} → ${timeOf(it.end)}</b><br><span class="muted">${mins(it.duration)} including the first boarding wait · ${metres(it.walkDistance)} walking. All times are Hong Kong time.</span></div>`;
+					(it.accessGaps || []).map(g => `<p class="source-warning" role="alert">${esc(g.message)}</p>`).join("") + `<div class="summary"><div class="big">${mins(it.displayDurationSeconds)}</div><small>from ${timeOf(it.requestedDeparture || it.start)} · all waits included</small>${journeyFlow(it)}</div><div class="times">Leave <b>${timeOf(it.start)}</b> → arrive <b>${timeOf(it.end)}</b><br><span class="muted">${mins(it.duration)} after leaving${it.originWaitSeconds > 0 ? " · " + mins(it.originWaitSeconds) + " before leaving" : ""} · ${metres(it.walkDistance)} walking. All times are Hong Kong time.</span></div>`;
 				$("route-summary")
 					.querySelectorAll("[data-flow-leg]")
 					.forEach(
@@ -1357,7 +1361,7 @@
 					if (l.waitBeforeSeconds > 0) {
 						const w = document.createElement("div");
 						w.className =
-							"wait " + (l.initialWaitExcluded ? "" : "transfer");
+							"wait " + (l.firstBoarding ? "" : "transfer");
 						w.innerHTML = waitHtml(l);
 						w.onclick = () => focusLeg(i, coords, [l.from.lat, l.from.lon]);
 						$("legs").append(w);
@@ -1543,7 +1547,7 @@
 					$("source-summary").innerHTML = overallSources(data.sources);
 					$("results").hidden = false;
 					$("search-info").textContent =
-						`${routes.length} option${routes.length === 1 ? "" : "s"} · ${data.elapsedSeconds}s search · ${data.includeAlternatives ? "includes other transport options · " : ""}60-minute departure window${data.warnings?.length ? " · Some alternative searches unavailable" : ""}`;
+						`${routes.length} option${routes.length === 1 ? "" : "s"} · ${data.elapsedSeconds}s search · ${data.includeAlternatives ? "distinct routes ranked together · " : ""}${data.sources?.search?.windowSeconds / 60 || 60}-minute departure window${data.warnings?.length ? " · Some alternative searches unavailable" : ""}`;
 					say("Routes found. Select an option, then expand its steps.");
 					render(0);
 				} catch (e) {

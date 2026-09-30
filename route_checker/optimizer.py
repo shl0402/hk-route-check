@@ -280,6 +280,8 @@ class TravelCache:
         inputs = [router.ROOT/'data/generated/hk-transit-EXPERIMENTAL.gtfs.zip',
                   router.ROOT/'data/generated/otp-smoke/build-config.json',
                   Path(router.__file__), Path(__file__)]
+        selection = Path(router.__file__).with_name('route_selection.py')
+        if selection.exists():inputs.append(selection)
         digest = hashlib.sha256(manifest.read_bytes() if manifest.exists() else b'')
         for path in inputs:
             digest.update(str(path.stat().st_mtime_ns).encode())
@@ -306,7 +308,7 @@ class TravelCache:
             if row:
                 return json.loads(row[0]), True
         response = self.router.plan(dict(origin=a,destination=b,departure=departure.isoformat(),modes=modes,preference='fastest'), for_optimization='fast' if fast else True)
-        options = response['itineraries']
+        options = [it for it in response['itineraries'] if not it.get('hasUnverifiedAccess')]
         if not options:
             # Routing errors are not the same as a genuinely disconnected pair.
             serious = [e for e in response.get('errors',[]) if e.get('code') not in ('NO_TRANSIT_CONNECTION','NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW')]

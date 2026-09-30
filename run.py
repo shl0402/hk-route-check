@@ -73,6 +73,7 @@ CACHE_PREFIX = (
 	'data/derived/mtr_service_hours/',
 	'data/landsd/raw/',
 	'data/surface/raw/',
+	'data/operators/raw/',
 )
 
 
@@ -113,7 +114,8 @@ def allowed_cache(name):
 		and (
 			name in CACHE_EXACT
 			or name.startswith(CACHE_PREFIX)
-			and (p.suffix in ('.json', '.html') or name.startswith('data/landsd/raw/') and p.suffix == '.geojson')
+			and (p.suffix in ('.json', '.html') or name.startswith('data/landsd/raw/') and p.suffix == '.geojson'
+				or name.startswith('data/operators/raw/') and p.suffix in ('.csv', '.pdf'))
 		)
 	)
 
@@ -417,6 +419,7 @@ def fetch(a):
 	script('scripts/landsd_enrich.py', 'fetch', '--root', ROOT, *flags)
 	script('scripts/indoor_network.py', 'fetch', '--root', ROOT, *flags)
 	script('scripts/surface_timing.py', 'fetch', '--root', ROOT, *flags)
+	script('scripts/operator_sources.py', 'fetch', '--root', ROOT, *flags)
 	for path, (url, sha) in TOOLS.items():
 		download(path, url, a.offline, checksum=sha)
 	print(
@@ -564,11 +567,11 @@ def build(a):
 
 	def validate():
 		shutil.copy2(
-			gen / 'hk-transit-SURFACE.gtfs.zip',
+			gen / 'hk-transit-OPERATOR.gtfs.zip',
 			gen / 'hk-transit-EXPERIMENTAL.gtfs.zip',
 		)
 		script('scripts/validate_gtfs.py', root=work)
-		script('scripts/check_surface_feed.py', gen / 'hk-transit-INDOOR.gtfs.zip', gen / 'hk-transit-EXPERIMENTAL.gtfs.zip', root=work)
+		script('scripts/check_surface_feed.py', gen / 'hk-transit-INDOOR.gtfs.zip', gen / 'hk-transit-SURFACE.gtfs.zip', root=work)
 		script('scripts/hkbus_pilot/check_merge.py', root=work)
 		script('scripts/hkrail/check_merge.py', root=work)
 
@@ -603,6 +606,7 @@ def build(a):
 		('08-landsd', lambda: script('scripts/landsd_enrich.py', 'merge', '--root', work, root=work), gen / 'hk-transit-LANDSD.gtfs.zip'),
 		('08b-indoor', lambda: script('scripts/indoor_network.py', 'compile', '--root', work, root=work), gen / 'hk-transit-INDOOR.gtfs.zip'),
 		('08c-surface-timing', lambda: script('scripts/surface_timing.py', 'merge', '--root', work, root=work), gen / 'hk-transit-SURFACE.gtfs.zip'),
+		('08d-operator-timetables', lambda: script('scripts/operator_timing.py', '--root', work, root=work), gen / 'hk-transit-OPERATOR.gtfs.zip'),
 		('09-validate', validate, gen / 'validator/report.json'),
 		('10-otp-graph', graph_build, graph / 'graph.obj'),
 	]
@@ -654,6 +658,7 @@ def build(a):
 		'landsd/station_levels.geojson',
 		'landsd/RESULTS.md',
 		'surface/report.json',
+		'operators/report.json',
 	):
 		if (work / 'data' / name).exists():
 			dest = ROOT / 'data' / name
@@ -675,6 +680,7 @@ def build(a):
 		'validation_errors': 0,
 		'indoor_validation_sha256': digest(ROOT / 'data/landsd/indoor/validation.json'),
 		'surface_report_sha256': digest(ROOT / 'data/surface/report.json'),
+		'operator_report_sha256': digest(ROOT / 'data/operators/report.json'),
 		'source_manifest': read(ROOT / 'data/source_manifest.json'),
 	}
 	save(live / 'release-manifest.json', manifest)
@@ -695,6 +701,8 @@ def check_build():
 			raise ValueError(f'Built artifact changed: {path}; rebuild before serving.')
 	if m.get('surface_report_sha256') and digest(ROOT / 'data/surface/report.json') != m['surface_report_sha256']:
 		raise ValueError('Surface timing report does not match the active release')
+	if m.get('operator_report_sha256') and digest(ROOT / 'data/operators/report.json') != m['operator_report_sha256']:
+		raise ValueError('Operator timetable report does not match the active release')
 	if m.get('indoor_validation_sha256') and digest(ROOT / 'data/landsd/indoor/validation.json') != m['indoor_validation_sha256']:
 		raise ValueError('Indoor validation report does not match the active release')
 	for filename, key in (('router-config.json', 'router_config_sha256'), ('build-config.json', 'build_config_sha256')):

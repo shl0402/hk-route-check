@@ -18,7 +18,7 @@ The sequence is:
 1. Verify/download government GTFS, OSM, route metadata, MTR station inventories and service hours.
 2. Discover bus/minibus wiki directories; compare candidates with GTFS; cache selected articles. Scrape rail wiki lines and all ordered pairs within each rail system.
 3. Parse source evidence and audit route identities; retain original data for ambiguous or unsupported cases.
-4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment → cross-validated indoor station pathways.
+4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment → cross-validated indoor station pathways → verified surface paths/timing anchors → verified Sun Ferry departures and journey ranges.
 5. Run the independent GTFS validator and rail merge checks, then build OTP once.
 6. Activate the successful feed and graph together; serve the Python API and HTML page.
 
@@ -61,6 +61,7 @@ Live MTR checks for the September snapshot, with the server running:
 ```sh
 .venv/bin/python -m unittest discover -s route_checker -p test_mtr_od_live.py
 .venv/bin/python -B route_checker/check_mtr_routes.py --otp-port 8081
+.venv/bin/python -B route_checker/check_routing_regressions.py
 ```
 
 The second check reads this checkout's feed and queries its running OTP directly; it does not create jobs or history. It checks every synthetic MTR trip's duration-separated route identity, weekday/weekend LOHAS Park–HKU, the reverse direction, three other station pairs, fastest ranking and bus alternatives. Dates default to the September snapshot; use `--weekday` and `--saturday` only with appropriate in-window dates and compatible cached operator timings.
@@ -148,3 +149,10 @@ adds those paths to GTFS for road-following map display. Unmatched paths retain
 an explicitly labelled straight-line-distance fallback. These are timetable
 estimates, not live traffic predictions. Source research, limitations, offline
 reproduction and the standalone w8g rebuild are in [SURFACE_TIMING.md](SURFACE_TIMING.md).
+
+The final operator stage also compares Sun Ferry CSV and current passenger pages,
+then rebuilds the two verified Central–island timetables with vessel classes and
+published journey ranges. All 31 discovered KMB section pages are cached and
+checked; district predictions are retained as evidence, not invented stop-pair
+times. Cache export includes these source files. See [verified changes and
+remaining data limits](ROUTING_ACCURACY.md).

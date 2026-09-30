@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from transit_identity import enrich_leg
+import route_selection
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
@@ -49,6 +51,9 @@ QUERY = '''query Route($origin:PlanLabeledLocationInput!,$destination:PlanLabele
  steps{distance relativeDirection absoluteDirection streetName bogusName lat lon exit}
  trip{gtfsId pattern{stops{gtfsId name lat lon platformCode}}}
  }}}}}'''
+MTR_ALTERNATIVE_QUERY = QUERY.replace(
+	'$prefs:PlanPreferencesInput)', '$prefs:PlanPreferencesInput,$via:[PlanViaLocationInput!])'
+).replace('preferences:$prefs,', 'preferences:$prefs,via:$via,')
 
 MTR_SOURCE_URL = 'https://www.mtr.com.hk/en/customer/services/train_service_index.html'
 TD_SOURCE_URL = 'https://static.data.gov.hk/td/pt-headway-en/gtfs.zip'
@@ -122,6 +127,7 @@ def source_context():
 			odtrips = api_proof.get('od_trips', {})
 			odjourneys = api_proof.get('od_journeys', {})
 		surface = json.loads(z.read('surface_timing_provenance.json')) if 'surface_timing_provenance.json' in z.namelist() else {}
+		operators = json.loads(z.read('operator_timing_provenance.json')) if 'operator_timing_provenance.json' in z.namelist() else {}
 		indoor = json.loads(z.read('indoor_provenance.json')) if 'indoor_provenance.json' in z.namelist() else {}
 		if 'transfers.txt' in z.namelist():
 			for r in csv.DictReader(
@@ -168,6 +174,7 @@ def source_context():
 		'feedstops': feedstops,
 		'indoor': indoor,
 		'surface': surface,
+		'operators': operators,
 	}
 	return _SOURCE_CONTEXT
 
@@ -311,8 +318,12 @@ def leg_provenance(leg, previous_transit=None):
 			wikiTable=wiki['table_index'],
 			wikiRows=wiki['source_rows'],
 			timingKind=wiki['timing_kind'],
+			corroboratingUrl=wiki.get('corroborating_url'),
+			identityVerification=wiki.get('identity_verification'),
 		)
 		item['warnings'].extend(wiki.get('warnings', []))
+		if wiki['timing_kind'] == 'published_departure_list':
+			item['waitingExplanation'] = 'Wait is calculated to a listed departure, or its estimated intermediate-stop time, with any boarding/transfer buffer. No full-headway wait is added. Not a live arrival prediction.'
 		item['intervalExplanation'] = (
 			'Published wiki departure times are used at the origin. Later stop times retain government running-time estimates; these are not live arrivals.'
 			if wiki['timing_kind'] == 'published_departure_list'
@@ -332,6 +343,17 @@ def leg_provenance(leg, previous_transit=None):
 				else 'No wiki override for this service.'
 			)
 		)
+	operator = context.get('operators', {}).get('trips', {}).get(tripid)
+	if operator:
+		lo, hi = operator['duration_range_seconds']
+		item.update(sourceType='operator', sourceName='Sun Ferry passenger timetable',
+			sourceUrl=operator['source_url'], snapshot=operator['snapshot'],
+			operatorTiming=operator, timingKind='published_departure_list',
+			runningTimeSource=f"Sun Ferry {operator['vessel']} ferry: {lo//60}–{hi//60} min; {hi//60} min used for planning.",
+			intervalExplanation='Published departure; arrival uses the upper end of the operator journey-time range. Not a live prediction.',
+			wikiStatus='')
+		item['warnings'].extend(operator['warnings'])
+		item['warnings'].append('Journey duration is an operator-published range, not a measured or guaranteed arrival.')
 	surface = context.get('surface', {})
 	pattern_id = surface.get('trips', {}).get(tripid)
 	if pattern_id:
@@ -514,7 +536,7 @@ def leg_provenance(leg, previous_transit=None):
 					'MTR journey planner: cached cumulative timings for this train path. No distance/speed fallback.'
 				)
 				item['warnings'].append(
-					'MTR publishes estimated journey times and may include an initial boarding allowance. That allowance cannot be separated from the API time; excluding the visible OTP first wait does not remove it.'
+					'MTR publishes estimated journey times and may include an initial boarding allowance. That allowance cannot be separated from the API time; the separate OTP boarding wait is also included and is not a live arrival prediction.'
 				)
 			else:
 				item['warnings'].append(
@@ -621,7 +643,7 @@ def route_sources(pref):
 			'windowSeconds': 3600,
 			'maxCandidates': 30,
 			'maxOptions': 5,
-			'walkReluctance': 8 if pref == 'walking' else 2,
+			'walkReluctance': 8 if pref == 'walking' else 1 if pref == 'fastest' else 2,
 			'transferPreferenceCost': 1800 if pref == 'transfers' else 0,
 			'explanation': 'Walking reluctance and the 1800-unit fewer-transfers penalty influence route selection. They do not add 1800 seconds to the displayed journey.',
 		},
@@ -629,7 +651,7 @@ def route_sources(pref):
 			{
 				'name': 'Rail running times',
 				'value': 'MTR: direct cached boarding/alighting pair totals compiled into OTP connections. Light Rail: API-derived segments where available, otherwise its separately labelled distance model.',
-				'status': 'Fallback only; accepted MTR API cumulative-time estimates replace covered segments. Per-leg details identify the source.',
+				'status': 'Whole MTR journey totals include internal line changes. Operator estimates can include waiting; this allowance is not separately identified.',
 			},
 			{
 				'name': 'Interchange minimum',
@@ -649,10 +671,10 @@ def route_sources(pref):
 			{
 				'name': 'Government intermediate stop times',
 				'value': 'About 88% of input arrival/departure fields are blank.',
-				'status': 'OTP interpolates them; populated fields are not independently verified.',
+				'status': 'The builder preserves published timing points and fills intermediate times using verified route-path distances where available. These remain estimates, without live traffic.',
 			},
 		],
-		'firstWaitRule': 'Only the gap before first boarding is excluded from the displayed duration. Transfer gaps remain included; scheduled times and ranking are unchanged.',
+		'firstWaitRule': 'Elapsed time runs from the requested departure to arrival, including time before leaving, the first boarding wait and later waits. Proposed departure and arrival are shown separately.',
 	}
 
 
@@ -673,14 +695,15 @@ def timestamp(value):
 	return datetime.fromisoformat(value).timestamp()
 
 
-def normalize(itinerary):
-	"""Remove exactly the visible gap before first boarding; retain later waits/timestamps."""
+def normalize(itinerary, requested_departure=None):
+	"""Keep all waits; distinguish elapsed-from-request from time after leaving."""
 	legs = itinerary['legs']
 	initial = 0
 	waits = 0
 	boardings = 0
 	previous_transit = None
 	for i, leg in enumerate(legs):
+		enrich_leg(leg, ROOT)
 		previous = legs[i - 1]['end']['scheduledTime'] if i else itinerary['start']
 		gap = max(
 			0, round(timestamp(leg['start']['scheduledTime']) - timestamp(previous))
@@ -692,7 +715,8 @@ def normalize(itinerary):
 		elif boardings > 0:
 			waits += gap
 		leg['waitBeforeSeconds'] = gap
-		leg['initialWaitExcluded'] = first
+		leg['firstBoarding'] = first
+		leg['initialWaitExcluded'] = False
 		if leg['mode'] == 'TRAM':
 			light = raw_gtfs_id((leg.get('route') or {}).get('gtfsId')).startswith(
 				'RAIL:LRT:'
@@ -741,6 +765,7 @@ def normalize(itinerary):
 			)
 		if od:
 			journey = context['odjourneys'][od['journey']]
+			leg['mtrPathStopIds'] = journey['stop_ids']
 			if abs(leg['duration'] - journey['api_total_seconds']) > 1:
 				raise ValueError(
 					'MTR graph and direct-pair timing evidence disagree; rebuild required.'
@@ -779,6 +804,8 @@ def normalize(itinerary):
 					}
 				)
 		leg['provenance'] = leg_provenance(leg, previous_transit)
+		if leg['provenance'].get('operatorTiming'):
+			leg['transportLabel'] = leg['provenance']['operatorTiming']['vessel'].title() + ' ferry'
 		if leg['transitLeg']:
 			intervals = leg['provenance'].get('feedIntervals', [])
 			leg['departureBasis'] = (
@@ -798,9 +825,16 @@ def normalize(itinerary):
 			leg.get('route') and ':RAIL:' in leg['route']['gtfsId']
 		)
 	duration = max(0, round(itinerary['duration']))
+	requested = requested_departure or itinerary['start']
+	start_wait = max(0, round(timestamp(itinerary['start']) - timestamp(requested)))
+	elapsed = max(0, round(timestamp(itinerary['end']) - timestamp(requested))) if itinerary.get('end') else duration + start_wait
 	itinerary.update(
-		initialWaitExcludedSeconds=initial,
-		displayDurationSeconds=max(0, duration - initial),
+		initialWaitExcludedSeconds=0,
+		initialWaitSeconds=initial,
+		requestedDeparture=requested,
+		originWaitSeconds=start_wait,
+		elapsedFromRequestSeconds=elapsed,
+		displayDurationSeconds=elapsed,
 		transferWaitSeconds=waits,
 		boardings=boardings,
 		transfers=max(0, boardings - 1),
@@ -903,6 +937,36 @@ def has_split_mtr_journey(itinerary):
 	return False
 
 
+@lru_cache(maxsize=4)
+def mtr_engine_stops(endpoint):
+	# Use actual feed-scoped IDs from this engine, never assume a feed prefix.
+	return tuple(s['gtfsId'] for s in graphql('{stops{gtfsId}}')['stops']
+		if ':RAIL:MTR:' in s['gtfsId'])
+
+
+def recover_mtr_candidates(data, variables, warnings):
+	ids = mtr_engine_stops(OTP)
+	stops = source_context()['feedstops']
+	origins = route_selection.nearby_station_groups(data['origin'], stops, ids)
+	destinations = route_selection.nearby_station_groups(data['destination'], stops, ids)
+	edges, calls = [], 0
+	started = time.monotonic()
+	for v, expected in route_selection.recovery_requests(variables, origins, destinations):
+		remaining = 30 - (time.monotonic() - started)
+		if remaining <= 0:
+			warnings.append('MTR alternative search reached its time budget; completed candidates are shown.')
+			break
+		try:
+			calls += 1
+			result = graphql(MTR_ALTERNATIVE_QUERY, v, timeout=min(12, remaining))['planConnection']
+			edges.extend(e for e in result['edges'] or [] if route_selection.matches_stations(e['node'], expected))
+		except (TimeoutError, OSError, RuntimeError):
+			warnings.append('One MTR station alternative was unavailable; completed candidates are shown.')
+			break
+	return edges, dict(queries=calls, originStations=len(origins), destinationStations=len(destinations),
+		stationRadiusMetres=2500, maxStationsPerEnd=6, maxQueries=16)
+
+
 def plan(data, for_optimization=False):
 	dt = validate_request(data)
 	include_alternatives = data.get('includeAlternatives', True)
@@ -915,6 +979,8 @@ def plan(data, for_optimization=False):
 		include_alternatives, max_results = False, 5
 	searches = ['Selected transport']
 	warnings = []
+	recovery = None
+	window_seconds = 600 if for_optimization == 'fast' else 3600
 	selected = data['modes']
 	pref = data['preference']
 	modes = {'direct': ['WALK']}
@@ -952,7 +1018,8 @@ def plan(data, for_optimization=False):
 		'date': {'earliestDeparture': dt.isoformat()},
 		'modes': modes,
 		'prefs': {
-			'street': {'walk': {'reluctance': 8 if pref == 'walking' else 2}},
+			'street': {'walk': {'reluctance': 8 if pref == 'walking' else 1 if pref == 'fastest' else 2,
+				**({'boardCost': 0} if pref == 'fastest' else {})}},
 			'transit': {
 				'board': {'waitReluctance': 1},
 				'transfer': {'cost': 1800 if pref == 'transfers' else 0},
@@ -1007,55 +1074,57 @@ def plan(data, for_optimization=False):
 					result['edges'] = (result['edges'] or []) + (alt['edges'] or [])
 				except Exception:
 					warnings.append(label + ' search unavailable; showing other completed searches.')
+		if 'mtr' in selected and include_alternatives and max_results > 1 and not for_optimization:
+			try:
+				extra, recovery = recover_mtr_candidates(data, variables, warnings)
+				result['edges'] = (result['edges'] or []) + extra
+				searches.append('MTR station alternatives')
+			except (OSError, RuntimeError):
+				warnings.append('MTR station alternatives unavailable; showing the ordinary search results.')
+		# Sparse services may have no departure in the first hour. Expand only an
+		# empty public-transport search, retaining the same requested departure.
+		usable_transit = lambda edges: any(any(l['transitLeg'] for l in e['node']['legs'])
+			and not has_split_mtr_journey(e['node']) for e in edges or [])
+		if selected and not usable_transit(result['edges']) and not for_optimization:
+			for hours in (2, 4):
+				try:
+					expanded = graphql(QUERY.replace('PT1H', f'PT{hours}H'), variables, timeout=25)['planConnection']
+				except Exception:
+					warnings.append('Later-departure search unavailable; showing completed searches.')
+					break
+				window_seconds = hours * 3600
+				result['edges'] = (result['edges'] or []) + (expanded['edges'] or [])
+				if usable_transit(expanded['edges']):
+					searches.append('Next available service')
+					break
 	items = [
-		normalize(edge['node'])
+		normalize(edge['node'], dt.isoformat())
 		for edge in result['edges'] or []
 		if not has_split_mtr_journey(edge['node'])
 	]
-	# Display adjustment does NOT change the route ranking, per the user's request.
-	if for_optimization:
-		key = lambda it: (timestamp(it['end']), it['walkDistance'])
-	elif pref == 'walking':
-		key = lambda it: (it['walkDistance'], it['duration'])
-	elif pref == 'transfers':
-		key = lambda it: (it['transfers'], it['duration'])
-	else:
-		key = lambda it: (it['duration'], it['walkDistance'])
-	seen = set()
-	unique = []
-	for it in sorted(items, key=key):
-		signature = tuple(
-			(
-				l['mode'],
-				(l.get('route') or {}).get('gtfsId'),
-				round(l['from']['lat'], 4),
-				round(l['from']['lon'], 4),
-				round(l['to']['lat'], 4),
-				round(l['to']['lon'], 4),
-			)
-			for l in it['legs']
-		)
-		if signature not in seen:
-			seen.add(signature)
-			unique.append(it)
+	for item in items:
+		item['accessGaps'] = route_selection.endpoint_coverage(item, data['origin'], data['destination'])
+		item['hasUnverifiedAccess'] = bool(item['accessGaps'])
+	# No mode quota: every distinct complete route competes under the same key.
+	unique = route_selection.select(items, 'fastest' if for_optimization else pref, max_results, timestamp)
 	if for_optimization == 'fast' and not unique:
 		return plan(data, for_optimization=True)
 	sources = route_sources(pref)
 	if 'search' in sources:
-		sources['search'].update(maxOptions=max_results, maxCandidates=(6 if for_optimization == 'fast' else 30) * len(searches), windowSeconds=600 if for_optimization == 'fast' else 3600, profiles=searches)
-		sources['search']['explanation'] += ' Allowed transport subsets add variety; all results keep the same preference and are deduplicated.' if include_alternatives else ''
+		sources['search'].update(maxOptions=max_results, maxCandidates=(6 if for_optimization == 'fast' else 30) * (len(searches) - int(recovery is not None) + (recovery or {}).get('queries', 0)), windowSeconds=window_seconds, profiles=searches, mtrRecovery=recovery)
+		sources['search']['explanation'] += ' Distinct station and transport candidates are ranked together; no places are reserved for a particular transport mode. Fastest means earliest arrival from the requested departure.'
 	return {
 		'itineraries': unique[:max_results],
 		'includeAlternatives': include_alternatives,
 		'maxResults': max_results,
 		'searches': searches,
 		'warnings': warnings,
-		'errors': result['routingErrors'],
+		'errors': [] if unique else result['routingErrors'],
 		'elapsedSeconds': round(time.monotonic() - started, 2),
 		'searchedCandidates': len(items),
 		'ranking': pref,
 		'sources': sources,
-		'note': ('Best alternatives returned by OTP in a 10-minute departure window.' if for_optimization == 'fast' else 'Best alternatives returned by OTP in a 60-minute departure window.') + ' Not a proof of global optimality.',
+		'note': f'Best distinct routes found in a {window_seconds // 60}-minute departure window; all waits included. Bounded candidate search, not a proof of global top-K optimality.',
 	}
 
 

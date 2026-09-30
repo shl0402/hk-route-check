@@ -28,7 +28,7 @@ Multi-stop mode supports 1–100 jobs; this is not a production journey planner.
 
 - Plan 1–100 jobs at **http://127.0.0.1:8000/multi**, with worker shifts, breaks, per-job work times, live progress and checked routes. Choose **Fast** or **Full pair search** for up to 20 jobs, or **More jobs** for up to 100; the first fast run prepares a cached network. [API and timings](docs/MULTI_STOP.md).
 - Search places or pick two points on the map; leave now or choose a departure time.
-- Compare up to **6 distinct routes**, including other selected transport options. Choose faster routes, fewer transfers, or less walking; turn off **Show alternatives** for a quicker search. [Two-point API](docs/TWO_POINT_API.md).
+- Compare up to **6 distinct routes**, ranked together with no transport quota. All six can be MTR via different stations. Choose earliest arrival, fewer transfers, or less walking; turn off **Show alternatives** for a quicker search. [Two-point API](docs/TWO_POINT_API.md).
 - Select MTR, buses/minibuses, ferries, Light Rail, Hong Kong Island trams, or funicular where the source feed supports them.
 - Follow an icon journey flow, highlight individual steps, and inspect timetable and ride-time sources.
 
@@ -84,7 +84,7 @@ python3 run.py
 
 MTR uses cached **whole station-pair journey estimates**, including the API's internal line changes. One continuous MTR journey counts as one trip; its line changes remain visible. It is encoded as virtual GTFS connections for this checker, not a claim that one physical train runs the entire journey.
 
-The displayed total excludes the first visible boarding wait; later waits remain. Published headways are **intervals, not live arrivals**. Bus intermediate times, walking, some Light Rail timings and transfer buffers may still be estimates. Wiki data is only merged where identity and timetable parsing pass the checks; other services keep their original source. A valid GTFS does not prove real-world timing accuracy.
+The displayed total runs **from your requested departure to arrival**, including the first wait and any time before leaving. Published headways are **intervals, not live arrivals**. Sun Ferry departures/classes use its current passenger timetable, with the upper end of its published journey-time range. Bus intermediate times, walking, some Light Rail timings and transfer buffers remain estimates. A valid GTFS does not prove real-world timing accuracy. [Verified changes and limits](docs/ROUTING_ACCURACY.md).
 
 **Multi-stop mode:** R5/OTP + OR-Tools searches for fewer workers, then checks actual-departure journeys. It includes all waits when checking shifts. If it cannot validate a schedule within the budget, it reports that explicitly. The More jobs mode uses R5 + OR-Tools Routing for up to 100 jobs; larger lists are not supported yet. [Details](docs/LARGE_MODE.md).
 

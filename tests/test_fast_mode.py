@@ -70,7 +70,7 @@ class FastModeTests(unittest.TestCase):
         data=dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr','bus'],preference='fastest')
         node=dict(end='2026-09-24T10:00:00+08:00',walkDistance=10,legs=[])
         def response(*args):return {'planConnection':{'edges':[{'node':node}], 'routingErrors':[]}}
-        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-24T09:00:00+08:00')), patch.object(server,'graphql',side_effect=response) as query, patch.object(server,'normalize',side_effect=lambda x:x), patch.object(server,'has_split_mtr_journey',return_value=False), patch.object(server,'route_sources',return_value={}):
+        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-24T09:00:00+08:00')), patch.object(server,'graphql',side_effect=response) as query, patch.object(server,'normalize',side_effect=lambda x,*_:x), patch.object(server,'has_split_mtr_journey',return_value=False), patch.object(server,'route_sources',return_value={}):
             result=server.plan(data,for_optimization='fast')
             self.assertEqual(len(result['itineraries']),1)
             self.assertEqual(query.call_count,2)
@@ -87,7 +87,7 @@ class FastModeTests(unittest.TestCase):
         data=dict(origin={'lat':22.3,'lon':114.1},destination={'lat':22.4,'lon':114.2},modes=['mtr'],preference='fastest')
         node=dict(end='2026-09-24T10:00:00+08:00',walkDistance=10,legs=[])
         def response(*args):return {'planConnection':{'edges':[{'node':node}], 'routingErrors':[]}}
-        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-24T09:00:00+08:00')), patch.object(server,'graphql',side_effect=response) as query, patch.object(server,'normalize',side_effect=lambda x:x), patch.object(server,'has_split_mtr_journey',side_effect=[True,False]), patch.object(server,'route_sources',return_value={}):
+        with patch.object(server,'validate_request',return_value=datetime.fromisoformat('2026-09-24T09:00:00+08:00')), patch.object(server,'graphql',side_effect=response) as query, patch.object(server,'normalize',side_effect=lambda x,*_:x), patch.object(server,'has_split_mtr_journey',side_effect=[True,False]), patch.object(server,'route_sources',return_value={}):
             result=server.plan(data,for_optimization='fast')
             self.assertEqual(len(result['itineraries']),1)
             self.assertEqual(query.call_count,2)

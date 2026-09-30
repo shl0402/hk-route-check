@@ -108,18 +108,28 @@ def package(root, target, output):
 		'data/generated/otp-smoke/router-config.json',
 		'data/generated/otp-smoke/hong-kong.osm.pbf',
 		'data/generated/release-manifest.json',
-		'route_checker/server.py', 'route_checker/check_indoor_routes.py',
+		'route_checker/server.py', 'route_checker/transit_identity.py', 'route_checker/route_selection.py', 'route_checker/check_indoor_routes.py',
 		'route_checker/check_mtr_routes.py', 'route_checker/check_surface_routes.py',
 		'scripts/landsd_enrich.py', 'scripts/indoor_network.py', 'scripts/indoor_matching.py', 'scripts/indoor_routing.py', 'scripts/rebuild_indoor.py',
 		'scripts/indoor_timing.py',
 		'scripts/surface_timing.py', 'scripts/rebuild_surface.py', 'scripts/check_surface_feed.py',
-		'docs/SURFACE_TIMING.md', 'data/surface/report.json',
+		'scripts/operator_sources.py', 'scripts/operator_timing.py', 'data/operators/report.json', 'docs/ROUTING_ACCURACY.md',
+		'docs/SURFACE_TIMING.md', 'docs/TRANSIT_PROVIDERS.md', 'data/surface/report.json',
 		'data/mtr_api/inventory.json',
 		'docs/INDOOR_ROUTING.md', 'docs/INDOOR_VALIDATION.md', 'tools/gtfs-validator-8.0.1-cli.jar',
 	]
+	# All routing modules are one versioned engine, including optimizer and dependencies.
+	files += [p.relative_to(root).as_posix() for p in (root / 'route_checker').glob('*.py')]
+	files += ['route_checker/places.json', 'route_checker/multi_examples.json',
+		'data/landsd/places.geojson', 'data/generated/quality_report.json',
+		'data/user_inputs/otp/otp-shaded-2.9.0.jar',
+		'data/raw/2026-09-17/osm/hong-kong-latest.osm.pbf',
+		'scripts/package_indoor_release.py', 'scripts/verify_routing_sync.py',
+		'scripts/templates/w8g_routing.py', 'docs/APP_ROUTING_SYNC.md']
 	files += [p.relative_to(root).as_posix() for p in (root / 'data/mtr_api/raw').glob('HR_*.json')]
-	for prefix in ('data/landsd/raw', 'data/landsd/indoor', 'data/surface/raw'):
+	for prefix in ('data/landsd/raw', 'data/landsd/indoor', 'data/surface/raw', 'data/operators/raw'):
 		files += [p.relative_to(root).as_posix() for p in (root / prefix).rglob('*') if p.is_file() and not p.name.startswith('.') and not p.name.endswith('.part')]
+	files = sorted(set(files))
 	for name in files:
 		p = payload / name
 		p.parent.mkdir(parents=True, exist_ok=True)
@@ -133,7 +143,10 @@ def package(root, target, output):
 	shutil.copy2(root / 'data/build-work/data/generated/hk-transit-LANDSD.gtfs.zip', base)
 	(base.parent / 'manifest.json').write_text(json.dumps(dict(sha256=digest(base),
 		description='Pre-indoor base feed from the complete upstream source build; retained for independent indoor rebuilding.'), indent=2))
-	(payload / 'requirements-indoor.txt').write_text('requests==2.34.2\npyogrio==0.13.0\npyproj==3.8.0\nshapely==2.1.2\n')
+	(payload / 'requirements-indoor.txt').write_text('requests==2.34.2\npyogrio==0.13.0\npyproj==3.8.0\nshapely==2.1.2\nbeautifulsoup4==4.15.0\n')
+	adapter = payload / 'server/routing.py'
+	adapter.parent.mkdir(parents=True, exist_ok=True)
+	shutil.copy2(root / 'scripts/templates/w8g_routing.py', adapter)
 	app = (target / 'server/app.py').read_text()
 	marker = '\t\t\t\tuid = s["user_id"]\n'
 	block = '''\t\t\t\tif path.startswith("/api/indoor/"):
@@ -151,9 +164,10 @@ def package(root, target, output):
 	app_path.write_text(app)
 	rows = []
 	for p in sorted(payload.rglob('*')):
-		if p.is_file():
+		if p.is_file() and not any(part.startswith('.') for part in p.relative_to(payload).parts):
 			name = p.relative_to(payload).as_posix()
-			rows.append(dict(path=name, sha256=digest(p), previous_sha256=digest(target / name)))
+			rows.append(dict(path=name, sha256=digest(p), previous_sha256=digest(target / name),
+				source_path=(name if name in files else 'scripts/templates/w8g_routing.py' if name == 'server/routing.py' else None)))
 	(output / 'manifest.json').write_text(json.dumps(dict(format=1, files=rows), indent=2))
 	(output / 'apply.py').write_text(INSTALLER)
 	print('Prepared', len(rows), 'files:', output)

@@ -306,6 +306,61 @@ def dates_for(days, start, end, holidays):
 	]
 
 
+def verified_n796_circular(n, candidates, tables, st, byroute):
+	"""Resolve the named circular route using stops and identical published bands.
+
+	The wiki calls the loop Mong Kok; TD calls it Tsim Sha Tsui. Both locations
+	are on the SAME circular stop sequence. The short TST-origin service is a
+	separate route and must not inherit the loop's departure list. This adapter
+	does not turn arbitrary headways into scheduled departures: an explicit
+	wiki clock list is required, and must agree with every TD frequency band.
+	"""
+	if n['title'] != '城巴N796線':
+		return None
+	groups = [g for g in n['groups'] if len(g['section_path']) == 1 and not g['variant']]
+	if len(groups) != 1:
+		return None
+	g = groups[0]
+	if g['errors'] or g['periods'] or g['layout'] != 'hour_minute' or g['origin'] != '日出康城' or g['days'] != list(range(8)):
+		return None
+	stops = {s['stop_id']: s for s in tables['stops.txt']}
+	cal = {c['service_id']: c for c in tables['calendar.txt']}
+	for c in candidates:
+		r = c['gtfs']; rid = r['route_id']; meta = c['government_metadata']
+		if (r['agency_id'], r['route_short_name'], rid) != ('CTB', 'N796', '8545'):
+			continue
+		if len(meta) != 1 or meta[0]['locStartNameC'] != '日出康城' or meta[0]['specialType'] != 0 or '循環' not in meta[0]['locEndNameC']:
+			continue
+		trips = byroute[rid]
+		if not trips:
+			continue
+		patterns = {tuple(x['stop_id'] for x in st[t['trip_id']]) for t in trips}
+		if len(patterns) != 1:
+			continue
+		pattern = next(iter(patterns))
+		names = [stops[s]['stop_name'].upper() for s in pattern]
+		if not pattern or pattern[0] != pattern[-1] or 'LOHAS PARK' not in names[0] or not any('TSIM SHA TSUI' in s for s in names) or not any('MONG KOK' in s for s in names):
+			continue
+		ids = {t['trip_id'] for t in trips}
+		bands = [f for f in tables['frequencies.txt'] if f['trip_id'] in ids]
+		if {f['trip_id'] for f in bands} != ids or any([cal[t['service_id']][d] for d in WEEK] != ['1']*7 for t in trips):
+			continue
+		if any(e['service_id'] in {t['service_id'] for t in trips} for e in tables.get('calendar_dates.txt', [])):
+			continue
+		expected = set()
+		for f in bands:
+			a, b, step = sec(f['start_time']), sec(f['end_time']), int(f['headway_secs'])
+			if a < 6*3600: a += 86400; b += 86400
+			if step <= 0 or b < a or (b-a) % step:
+				return None
+			# Endpoints are only accepted because the independent clock list
+			# explicitly includes them (GTFS frequency end itself is exclusive).
+			expected.update(range(a, b+1, step))
+		if expected == set(g['departures']):
+			return c
+	return None
+
+
 def main(args):
 	target = Path(args.output)
 	baseline = Path(args.base)
@@ -388,9 +443,12 @@ def main(args):
 		audit = auditmap[n['title']]
 		a = articles[n['title']]
 		candidates = audit['candidates']
+		verified_loop = verified_n796_circular(n, candidates, tables, st, byroute)
 		# Unique candidate OR exact primary-terminal candidate, but no collapsing special-route records.
 		strong = [c for c in candidates if c['exact_terminal_pair']]
-		if len(candidates) == 1 and (
+		if verified_loop:
+			c = verified_loop
+		elif len(candidates) == 1 and (
 			audit['mutually_unique_identity_supported']
 			or candidates[0]['government_metadata']
 		):
@@ -415,7 +473,7 @@ def main(args):
 			== {norm(m['locStartNameC']), norm(m['locEndNameC'])}
 			for m in meta
 		)
-		if not (primary_pair or c['exact_terminal_pair']):
+		if not (primary_pair or c['exact_terminal_pair'] or verified_loop):
 			skipped.append(
 				dict(
 					title=n['title'],
@@ -453,7 +511,7 @@ def main(args):
 		dm = re.search(r'班次資料最後於(\d{4})年(\d{1,2})月更新', source_service)
 		source_month = f'{dm[1]}-{int(dm[2]):02}' if dm else None
 		government_month = max(m.get('lastUpdateDate', '')[:7] for m in meta)
-		if source_month and source_month < government_month:
+		if source_month and source_month < government_month and not verified_loop:
 			skipped.append(
 				dict(
 					title=n['title'],
@@ -583,6 +641,10 @@ def main(args):
 				proof['warnings'].append(
 					'Government stop sequence and running-time offsets retained; intermediate times may still be interpolated. Wiki departure data is not a live prediction.'
 				)
+				if verified_loop:
+					proof['identity_verification'] = 'Daily circular LOHAS Park route verified through both Tsim Sha Tsui and Mong Kok; explicit clock list agrees with all government frequency bands. Short special service kept separate.'
+					proof['corroborating_url'] = 'https://www.citybus.com.hk/en/uploadedFiles/cust_notice/TS-NWFB-N796-N796-N.pdf'
+					proof['warnings'].append('The listed departures are published schedules, not live arrivals. The older wiki clock list is accepted because it agrees with the government service bands and operator timetable; intermediate times remain estimates.')
 				if not source_month:
 					proof['warnings'].append(
 						'Wiki timetable has no stated update month; freshness against government timings is unverified.'
