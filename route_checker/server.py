@@ -675,7 +675,7 @@ def route_sources(pref):
 				'status': 'The builder preserves published timing points and fills intermediate times using verified route-path distances where available. These remain estimates, without live traffic.',
 			},
 		],
-		'firstWaitRule': 'Elapsed time runs from the requested departure to arrival, including time before leaving, the first boarding wait and later waits. Proposed departure and arrival are shown separately.',
+		'firstWaitRule': 'Elapsed time runs from the requested departure to arrival, including time before leaving, the first boarding wait and later waits. Proposed departure and arrival are shown separately. Frequency waits are estimates after reaching the platform, not known departures that can be caught by leaving later.',
 	}
 
 
@@ -694,6 +694,46 @@ def graphql(query, variables=None, timeout=80):
 
 def timestamp(value):
 	return datetime.fromisoformat(value).timestamp()
+
+
+def plan_connection(query, variables, warnings, timeout=80):
+	"""Recover departure-minute frequency candidates pruned by OTP's wider search.
+
+	Do not move a frequency wait to the origin: it is an allowance after reaching
+	the platform, not a known train departure. Ask OTP for another complete route.
+	Keep the wide search for scheduled services and later, faster connections.
+	"""
+	started = time.monotonic()
+	result = graphql(query, variables, timeout=timeout)['planConnection']
+	trip_ids = {
+		raw_gtfs_id((leg.get('trip') or {}).get('gtfsId'))
+		for edge in result.get('edges') or []
+		for leg in edge['node']['legs']
+		if leg.get('transitLeg') and (leg.get('trip') or {}).get('gtfsId')
+	}
+	if not trip_ids:
+		return result
+	frequencies = source_context().get('frequencies', {})
+	if not any(
+		row.get('exactTimes', 0) != 1
+		for trip_id in trip_ids for row in frequencies.get(trip_id, [])
+	):
+		return result
+	anchored = re.sub(r'searchWindow:"[^"]+"', 'searchWindow:"PT1M"', query)
+	if anchored == query:
+		return result
+	remaining = min(15, timeout - (time.monotonic() - started))
+	try:
+		if remaining <= 0:
+			raise TimeoutError()
+		result['departureAnchorQueries'] = 1
+		early = graphql(anchored, variables, timeout=remaining)['planConnection']
+		result['edges'] = (result.get('edges') or []) + (early.get('edges') or [])
+	except (OSError, RuntimeError):
+		message = 'Departure-time check unavailable; earlier frequency routes may be missing.'
+		if message not in warnings:
+			warnings.append(message)
+	return result
 
 
 def normalize(itinerary, requested_departure=None):
@@ -963,13 +1003,14 @@ def recover_mtr_candidates(data, variables, warnings):
 			break
 		try:
 			calls += 1
-			result = graphql(MTR_ALTERNATIVE_QUERY, v, timeout=min(12, remaining))['planConnection']
+			result = plan_connection(MTR_ALTERNATIVE_QUERY, v, warnings, timeout=min(12, remaining))
+			calls += result.get('departureAnchorQueries', 0)
 			edges.extend(e for e in result['edges'] or [] if route_selection.matches_stations(e['node'], expected))
 		except (TimeoutError, OSError, RuntimeError):
 			warnings.append('One MTR station alternative was unavailable; completed candidates are shown.')
 			break
 	return edges, dict(queries=calls, originStations=len(origins), destinationStations=len(destinations),
-		stationRadiusMetres=2500, maxStationsPerEnd=6, maxQueries=16)
+		stationRadiusMetres=2500, maxStationsPerEnd=6, maxQueries=32)
 
 
 def plan(data, for_optimization=False):
@@ -1041,7 +1082,7 @@ def plan(data, for_optimization=False):
 	# Fast-mode replay needs a usable departure, not 30 alternatives over an hour.
 	query = QUERY.replace('first:30,searchWindow:"PT1H"', 'first:6,searchWindow:"PT10M"') if for_optimization == 'fast' else QUERY
 	with ROUTE_LOCK:
-		result = graphql(query, variables)['planConnection']
+		result = plan_connection(query, variables, warnings)
 		if 'mtr' in selected and len(selected) > 1:
 			# Keep a complete MTR candidate even if the mixed search preferred an
 			# invalid sum of shorter MTR journeys. No display-only timing correction.
@@ -1052,7 +1093,7 @@ def plan(data, for_optimization=False):
 			railvars['prefs']['transit'].pop('filters', None)
 			railvars['prefs']['transit']['transfer']['maximumTransfers'] = 0
 			searches.append('MTR')
-			railresult = graphql(query, railvars)['planConnection']
+			railresult = plan_connection(query, railvars, warnings)
 			result['edges'] = (result['edges'] or []) + (railresult['edges'] or [])
 		if include_alternatives and max_results > 1 and len(selected) > 1:
 			# OTP can suppress slower but useful modes in a combined search.
@@ -1075,7 +1116,7 @@ def plan(data, for_optimization=False):
 					altvars['prefs']['transit']['filters'] = altfilters
 				searches.append(label)
 				try:
-					alt = graphql(query, altvars, timeout=25)['planConnection']
+					alt = plan_connection(query, altvars, warnings, timeout=25)
 					result['edges'] = (result['edges'] or []) + (alt['edges'] or [])
 				except Exception:
 					warnings.append(label + ' search unavailable; showing other completed searches.')
@@ -1093,7 +1134,7 @@ def plan(data, for_optimization=False):
 		if selected and not usable_transit(result['edges']) and not for_optimization:
 			for hours in (2, 4):
 				try:
-					expanded = graphql(QUERY.replace('PT1H', f'PT{hours}H'), variables, timeout=25)['planConnection']
+					expanded = plan_connection(QUERY.replace('PT1H', f'PT{hours}H'), variables, warnings, timeout=25)
 				except Exception:
 					warnings.append('Later-departure search unavailable; showing completed searches.')
 					break
@@ -1116,8 +1157,8 @@ def plan(data, for_optimization=False):
 		return plan(data, for_optimization=True)
 	sources = route_sources(pref)
 	if 'search' in sources:
-		sources['search'].update(maxOptions=max_results, maxCandidates=(6 if for_optimization == 'fast' else 30) * (len(searches) - int(recovery is not None) + (recovery or {}).get('queries', 0)), windowSeconds=window_seconds, profiles=searches, mtrRecovery=recovery)
-		sources['search']['explanation'] += ' Distinct station and transport candidates are ranked together; no places are reserved for a particular transport mode. Fastest means earliest arrival from the requested departure.'
+		sources['search'].update(maxOptions=max_results, maxCandidates=(6 if for_optimization == 'fast' else 30) * (2 * (len(searches) - int(recovery is not None)) + (recovery or {}).get('queries', 0)), windowSeconds=window_seconds, profiles=searches, mtrRecovery=recovery)
+		sources['search']['explanation'] += ' Distinct station and transport candidates are ranked together; no places are reserved for a particular transport mode. Fastest means earliest arrival from the requested departure. Frequency results receive an additional departure-minute search to recover earlier candidates pruned by the wider window.'
 	return {
 		'itineraries': unique[:max_results],
 		'includeAlternatives': include_alternatives,

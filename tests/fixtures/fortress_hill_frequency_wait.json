@@ -1,0 +1,507 @@
+{
+	"description": "OTP 2.9, 2026-10-02 11:00 HKT, Electric Road Market near Fortress Hill to LOHAS Park. First wide-search result versus departure-minute result. First train headway 246 seconds, exact_times=0.",
+	"wide": {
+		"edges": [
+			{
+				"node": {
+					"duration": 2155,
+					"start": "2026-10-02T11:15:00+08:00",
+					"end": "2026-10-02T11:50:55+08:00",
+					"waitingTime": 246,
+					"walkTime": 589,
+					"walkDistance": 429.18,
+					"numberOfTransfers": 0,
+					"legs": [
+						{
+							"mode": "WALK",
+							"transitLeg": false,
+							"interlineWithPreviousLeg": false,
+							"duration": 395.0,
+							"distance": 275.44,
+							"headsign": null,
+							"start": {
+								"scheduledTime": "2026-10-02T11:15:00+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:21:35+08:00"
+							},
+							"from": {
+								"name": "Origin",
+								"lat": 22.28943,
+								"lon": 114.19364,
+								"stop": null
+							},
+							"to": {
+								"name": "Fortress Hill (ISL)",
+								"lat": 22.288411,
+								"lon": 114.193708,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:30:ISL",
+									"platformCode": null
+								}
+							},
+							"route": null,
+							"legGeometry": {
+								"points": "uk`gCmm~wT\\XtCfCABHFDGFIn@_ABCBEDGBCJGSQo@i@KKCB"
+							},
+							"steps": [
+								{
+									"distance": 139.88,
+									"relativeDirection": "DEPART",
+									"absoluteDirection": "SOUTHWEST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.2893993,
+									"lon": 114.1936797,
+									"exit": null
+								},
+								{
+									"distance": 77.52,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "SOUTHEAST",
+									"streetName": "\u6cb9\u8857 Oil Street",
+									"bogusName": false,
+									"lat": 22.288455,
+									"lon": 114.1928062,
+									"exit": null
+								},
+								{
+									"distance": 58.04,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "\u82f1\u7687\u9053 King's Road",
+									"bogusName": false,
+									"lat": 22.2879939,
+									"lon": 114.1933679,
+									"exit": null
+								}
+							],
+							"trip": null
+						},
+						{
+							"mode": "SUBWAY",
+							"transitLeg": true,
+							"interlineWithPreviousLeg": false,
+							"duration": 1320.0,
+							"distance": 7767.06,
+							"headsign": "LOHAS Park (TKL)",
+							"start": {
+								"scheduledTime": "2026-10-02T11:25:41+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:47:41+08:00"
+							},
+							"from": {
+								"name": "Fortress Hill (ISL)",
+								"lat": 22.288411,
+								"lon": 114.193708,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:30:ISL",
+									"platformCode": null
+								}
+							},
+							"to": {
+								"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+								"lat": 22.2955925,
+								"lon": 114.2688008,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+									"platformCode": "1/2"
+								}
+							},
+							"route": {
+								"gtfsId": "1:RAIL:MTR:ISL:PATH:1320",
+								"shortName": "ISL",
+								"longName": "ISL MTR"
+							},
+							"legGeometry": {
+								"points": "qe`gCsm~wT{k@ktM"
+							},
+							"steps": [],
+							"trip": {
+								"gtfsId": "1:MTRAPI:30:57:0:TKO:30",
+								"pattern": {
+									"stops": [
+										{
+											"gtfsId": "1:RAIL:MTR:30:ISL",
+											"name": "Fortress Hill (ISL)",
+											"lat": 22.288411,
+											"lon": 114.193708,
+											"platformCode": null
+										},
+										{
+											"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+											"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+											"lat": 22.2955925,
+											"lon": 114.2688008,
+											"platformCode": "1/2"
+										}
+									]
+								}
+							}
+						},
+						{
+							"mode": "WALK",
+							"transitLeg": false,
+							"interlineWithPreviousLeg": false,
+							"duration": 194.0,
+							"distance": 153.74,
+							"headsign": null,
+							"start": {
+								"scheduledTime": "2026-10-02T11:47:41+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:50:55+08:00"
+							},
+							"from": {
+								"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+								"lat": 22.2955925,
+								"lon": 114.2688008,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+									"platformCode": "1/2"
+								}
+							},
+							"to": {
+								"name": "Destination",
+								"lat": 22.29559,
+								"lon": 114.26873,
+								"stop": null
+							},
+							"route": null,
+							"legGeometry": {
+								"points": "mragC_cmxT??CB@@DFBDDD@@BCGG??AC??????AA??GIEDFFFJ??Xb@BB?@@?@BCBA@A@@???UUQJEDS[\\Y@E??"
+							},
+							"steps": [
+								{
+									"distance": 29.98,
+									"relativeDirection": "DEPART",
+									"absoluteDirection": "SOUTH",
+									"streetName": "pathway",
+									"bogusName": true,
+									"lat": 22.2955925,
+									"lon": 114.2688008,
+									"exit": null
+								},
+								{
+									"distance": 0.0,
+									"relativeDirection": "ELEVATOR",
+									"absoluteDirection": null,
+									"streetName": "elevator",
+									"bogusName": false,
+									"lat": 22.2955438,
+									"lon": 114.2687424,
+									"exit": null
+								},
+								{
+									"distance": 63.69,
+									"relativeDirection": "HARD_LEFT",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "pathway",
+									"bogusName": true,
+									"lat": 22.2955438,
+									"lon": 114.2687424,
+									"exit": null
+								},
+								{
+									"distance": 0.0,
+									"relativeDirection": "EXIT_STATION",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "Mass Transit Railway LOHAS Park Station-B Access",
+									"bogusName": false,
+									"lat": 22.2954099,
+									"lon": 114.2684074,
+									"exit": null
+								},
+								{
+									"distance": 16.16,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "NORTHWEST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.2955174,
+									"lon": 114.268519,
+									"exit": null
+								},
+								{
+									"distance": 18.6,
+									"relativeDirection": "CONTINUE",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "escalator",
+									"bogusName": false,
+									"lat": 22.2956337,
+									"lon": 114.2684248,
+									"exit": null
+								},
+								{
+									"distance": 25.32,
+									"relativeDirection": "RIGHT",
+									"absoluteDirection": "SOUTHEAST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.295738,
+									"lon": 114.2685661,
+									"exit": null
+								}
+							],
+							"trip": null
+						}
+					]
+				}
+			}
+		],
+		"routingErrors": []
+	},
+	"early": {
+		"routingErrors": [],
+		"edges": [
+			{
+				"node": {
+					"duration": 2155,
+					"start": "2026-10-02T11:00:00+08:00",
+					"end": "2026-10-02T11:35:55+08:00",
+					"waitingTime": 246,
+					"walkTime": 589,
+					"walkDistance": 429.18,
+					"numberOfTransfers": 0,
+					"legs": [
+						{
+							"mode": "WALK",
+							"transitLeg": false,
+							"interlineWithPreviousLeg": false,
+							"duration": 395.0,
+							"distance": 275.44,
+							"headsign": null,
+							"start": {
+								"scheduledTime": "2026-10-02T11:00:00+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:06:35+08:00"
+							},
+							"from": {
+								"name": "Origin",
+								"lat": 22.28943,
+								"lon": 114.19364,
+								"stop": null
+							},
+							"to": {
+								"name": "Fortress Hill (ISL)",
+								"lat": 22.288411,
+								"lon": 114.193708,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:30:ISL",
+									"platformCode": null
+								}
+							},
+							"route": null,
+							"legGeometry": {
+								"points": "uk`gCmm~wT\\XtCfCABHFDGFIn@_ABCBEDGBCJGSQo@i@KKCB"
+							},
+							"steps": [
+								{
+									"distance": 139.88,
+									"relativeDirection": "DEPART",
+									"absoluteDirection": "SOUTHWEST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.2893993,
+									"lon": 114.1936797,
+									"exit": null
+								},
+								{
+									"distance": 77.52,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "SOUTHEAST",
+									"streetName": "\u6cb9\u8857 Oil Street",
+									"bogusName": false,
+									"lat": 22.288455,
+									"lon": 114.1928062,
+									"exit": null
+								},
+								{
+									"distance": 58.04,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "\u82f1\u7687\u9053 King's Road",
+									"bogusName": false,
+									"lat": 22.2879939,
+									"lon": 114.1933679,
+									"exit": null
+								}
+							],
+							"trip": null
+						},
+						{
+							"mode": "SUBWAY",
+							"transitLeg": true,
+							"interlineWithPreviousLeg": false,
+							"duration": 1320.0,
+							"distance": 7767.06,
+							"headsign": "LOHAS Park (TKL)",
+							"start": {
+								"scheduledTime": "2026-10-02T11:10:41+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:32:41+08:00"
+							},
+							"from": {
+								"name": "Fortress Hill (ISL)",
+								"lat": 22.288411,
+								"lon": 114.193708,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:30:ISL",
+									"platformCode": null
+								}
+							},
+							"to": {
+								"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+								"lat": 22.2955925,
+								"lon": 114.2688008,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+									"platformCode": "1/2"
+								}
+							},
+							"route": {
+								"gtfsId": "1:RAIL:MTR:ISL:PATH:1320",
+								"shortName": "ISL",
+								"longName": "ISL MTR"
+							},
+							"legGeometry": {
+								"points": "qe`gCsm~wT{k@ktM"
+							},
+							"steps": [],
+							"trip": {
+								"gtfsId": "1:MTRAPI:30:57:0:TKO:30",
+								"pattern": {
+									"stops": [
+										{
+											"gtfsId": "1:RAIL:MTR:30:ISL",
+											"name": "Fortress Hill (ISL)",
+											"lat": 22.288411,
+											"lon": 114.193708,
+											"platformCode": null
+										},
+										{
+											"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+											"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+											"lat": 22.2955925,
+											"lon": 114.2688008,
+											"platformCode": "1/2"
+										}
+									]
+								}
+							}
+						},
+						{
+							"mode": "WALK",
+							"transitLeg": false,
+							"interlineWithPreviousLeg": false,
+							"duration": 194.0,
+							"distance": 153.74,
+							"headsign": null,
+							"start": {
+								"scheduledTime": "2026-10-02T11:32:41+08:00"
+							},
+							"end": {
+								"scheduledTime": "2026-10-02T11:35:55+08:00"
+							},
+							"from": {
+								"name": "LOHAS Park (TKL) \u00b7 Platform 1/2",
+								"lat": 22.2955925,
+								"lon": 114.2688008,
+								"stop": {
+									"gtfsId": "1:RAIL:MTR:57:TKL:AREA:b1cf5f3e-9490-49fa-a701-3669ab403262",
+									"platformCode": "1/2"
+								}
+							},
+							"to": {
+								"name": "Destination",
+								"lat": 22.29559,
+								"lon": 114.26873,
+								"stop": null
+							},
+							"route": null,
+							"legGeometry": {
+								"points": "mragC_cmxT??CB@@DFBDDD@@BCGG??AC??????AA??GIEDFFFJ??Xb@BB?@@?@BCBA@A@@???UUQJEDS[\\Y@E??"
+							},
+							"steps": [
+								{
+									"distance": 29.98,
+									"relativeDirection": "DEPART",
+									"absoluteDirection": "SOUTH",
+									"streetName": "pathway",
+									"bogusName": true,
+									"lat": 22.2955925,
+									"lon": 114.2688008,
+									"exit": null
+								},
+								{
+									"distance": 0.0,
+									"relativeDirection": "ELEVATOR",
+									"absoluteDirection": null,
+									"streetName": "elevator",
+									"bogusName": false,
+									"lat": 22.2955438,
+									"lon": 114.2687424,
+									"exit": null
+								},
+								{
+									"distance": 63.69,
+									"relativeDirection": "HARD_LEFT",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "pathway",
+									"bogusName": true,
+									"lat": 22.2955438,
+									"lon": 114.2687424,
+									"exit": null
+								},
+								{
+									"distance": 0.0,
+									"relativeDirection": "EXIT_STATION",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "Mass Transit Railway LOHAS Park Station-B Access",
+									"bogusName": false,
+									"lat": 22.2954099,
+									"lon": 114.2684074,
+									"exit": null
+								},
+								{
+									"distance": 16.16,
+									"relativeDirection": "LEFT",
+									"absoluteDirection": "NORTHWEST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.2955174,
+									"lon": 114.268519,
+									"exit": null
+								},
+								{
+									"distance": 18.6,
+									"relativeDirection": "CONTINUE",
+									"absoluteDirection": "NORTHEAST",
+									"streetName": "escalator",
+									"bogusName": false,
+									"lat": 22.2956337,
+									"lon": 114.2684248,
+									"exit": null
+								},
+								{
+									"distance": 25.32,
+									"relativeDirection": "RIGHT",
+									"absoluteDirection": "SOUTHEAST",
+									"streetName": "path",
+									"bogusName": true,
+									"lat": 22.295738,
+									"lon": 114.2685661,
+									"exit": null
+								}
+							],
+							"trip": null
+						}
+					]
+				}
+			}
+		]
+	}
+}
