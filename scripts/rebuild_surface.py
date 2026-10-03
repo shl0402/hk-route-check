@@ -5,6 +5,10 @@ No running server is started/stopped; no active routing files are overwritten.
 The bundled base already contains the independently reproducible indoor update.
 """
 import argparse
+from datetime import date, timedelta
+from transit_enrichment import identity, official, history, holidays, published
+from transit_enrichment.merge import compile_base, compile_timing
+from transit_enrichment.check import verify
 import json
 from pathlib import Path
 import shutil
@@ -22,16 +26,27 @@ def build(root, refresh=False):
 		raise ValueError('Bundled pre-surface GTFS does not match manifest')
 	surface_timing.fetch(root, offline=not refresh, refresh=refresh)
 	operator_sources.fetch(root, offline=not refresh, refresh=refresh)
+	for module in (identity, official, history, holidays, published):
+		module.fetch(root, offline=not refresh, refresh=refresh)
 	work = root / 'data/surface-rebuild'
 	shutil.copytree(root / 'data/surface/raw', work / 'data/surface/raw', dirs_exist_ok=True)
 	shutil.copytree(root / 'data/operators/raw', work / 'data/operators/raw', dirs_exist_ok=True)
+	shutil.copytree(root / 'data/transit_enrichment/raw', work / 'data/transit_enrichment/raw', dirs_exist_ok=True)
 	gen = work / 'data/generated'
 	gen.mkdir(parents=True, exist_ok=True)
 	feed = gen / 'hk-transit-EXPERIMENTAL.gtfs.zip'
 	surface_feed = gen / 'hk-transit-SURFACE.gtfs.zip'
-	surface_timing.merge(work, base, surface_feed)
-	check(base, surface_feed)
-	operator_timing.merge(work, surface_feed, feed)
+	config = json.loads((root / 'data/generated/otp-smoke/build-config.json').read_text())
+	start = date.fromisoformat(config['transitServiceStart'])
+	end = date.fromisoformat(config['transitServiceEnd']) - timedelta(days=1)
+	enriched_base = gen / 'hk-transit-ENRICHED-BASE.gtfs.zip'
+	enriched = gen / 'hk-transit-ENRICHED.gtfs.zip'
+	compile_base(work, base, enriched_base, start, end)
+	surface_timing.merge(work, enriched_base, surface_feed)
+	check(enriched_base, surface_feed)
+	compile_timing(work, enriched_base, surface_feed, enriched)
+	verify(enriched_base, surface_feed, enriched, work / 'data/transit_enrichment/validation.json')
+	operator_timing.merge(work, enriched, feed)
 	validator = root / 'tools/gtfs-validator-8.0.1-cli.jar'
 	with (gen / 'validator.log').open('w') as log:
 		subprocess.run(['java', '-Xmx3G', '-jar', str(validator), '-i', str(feed),

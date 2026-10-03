@@ -1116,8 +1116,30 @@
 						(p.feedIntervals || []).map((r) => r.headwaySeconds / 60),
 					),
 				];
-				return `<details class="provenance"><summary>Data source & timing assumptions</summary><p>${sourceLink(p.sourceUrl, p.sourceName)}${p.snapshot ? " · snapshot " + esc(p.snapshot) : ""}</p>${intervals.length ? `<p><b>Interval used by this feed: ${intervals.join(", ")} minutes between vehicles.</b></p>` : ""}${p.sourceType === "wiki" ? "<p><b>Timetable: Wiki</b> · revision " + esc(p.wikiRevision) + (p.wikiPublishedMonth ? " · published " + esc(p.wikiPublishedMonth) : " · update month unknown") + "<br>Stops and running times: government GTFS</p>" : ""}${p.sourceType === "rail_wiki" ? "<p><b>Timetable: Railway Wiki</b> · revision " + esc(p.wikiRevision) + (p.wikiPublishedMonth ? " · updated " + esc(p.wikiPublishedMonth) : " · effective date unknown") + "<br>Stops: supplied MTR data · " + esc(p.runningTimeSource ? "Running-time sources below." : "Running times: distance estimates") + "</p>" + (p.wikiInterval ? "<p>Wiki interval for this period: <b>" + esc(p.wikiInterval.raw) + " minutes</b></p>" : "") : ""}${p.runningTimeSource ? "<p><b>Running times:</b> " + (p.journeyTiming ? esc(p.runningTimeSource) : sourceLink(p.runningTimePlannerUrl || p.runningTimeSourceUrl, p.runningTimeSource)) + "</p>" : ""}${p.waitingExplanation ? "<p>" + esc(p.waitingExplanation) + "</p>" : ""}${p.intervalExplanation ? "<p>" + esc(p.intervalExplanation) + "</p>" : ""}${p.publishedIntervals?.length ? "<p><b>" + sourceLink("https://www.mtr.com.hk/en/customer/services/train_service_index.html", "Official MTR summary: " + p.line) + "</b></p><table><tbody>" + p.publishedIntervals.map((r) => "<tr><td>" + esc(r.period) + "</td><td>" + esc(r.minutes) + " min</td></tr>").join("") + "</tbody></table>" : ""}${p.headwayPolicy ? "<p>Current model policy: " + esc(p.headwayPolicy) + "</p>" : ""}${(p.warnings || []).map((w) => '<p class="source-warning">' + esc(w) + "</p>").join("")}${p.minimumTransferSeconds != null ? "<p><b>Feed transfer minimum: " + mins(p.minimumTransferSeconds) + "</b><br>" + esc(p.transferExplanation) + "</p>" : ""}${p.runningTimeSegments?.length ? "<details><summary>Running-time calculation for " + p.runningTimeSegments.length + " segments</summary>" + p.runningTimeSegments.map((s) => "<p><b>" + esc(s.key) + " · " + s.seconds + " seconds</b><br>" + (s.kind === "ASSUMPTION_distance_speed_model" ? esc(s.evidence.straight_line_metres) + " m straight line × " + esc(s.evidence.detour_factor) + " at " + esc(s.evidence.speed_kmh) + " km/h + " + esc(s.evidence.dwell_seconds) + " seconds; minimum 45 seconds." : ["OPERATOR_DERIVED_estimate", "MTR_API_CUMULATIVE"].includes(s.kind) ? sourceLink(s.evidence.planner_url || s.evidence.source_urls?.[0], s.kind === "MTR_API_CUMULATIVE" ? "MTR cached journey timing" : "MTR API-derived estimate") + " · " + esc(s.evidence.reason) : "Reviewed override: " + esc(s.evidence.source)) + "</p>").join("") + "</details>" : ""}</details>`;
+				return `<details class="provenance"><summary>Data source & timing assumptions</summary><p>${sourceLink(p.sourceUrl, p.sourceName)}${p.snapshot ? " · snapshot " + esc(p.snapshot) : ""}</p>${intervals.length ? `<p><b>Interval used by this feed: ${intervals.join(", ")} minutes between vehicles.</b></p>` : ""}${p.sourceType === "wiki" ? "<p><b>Timetable: Wiki</b> · revision " + esc(p.wikiRevision) + (p.wikiPublishedMonth ? " · published " + esc(p.wikiPublishedMonth) : " · update month unknown") + "<br>Stops: government GTFS · ride-time sources below.</p>" : ""}${p.sourceType === "rail_wiki" ? "<p><b>Timetable: Railway Wiki</b> · revision " + esc(p.wikiRevision) + (p.wikiPublishedMonth ? " · updated " + esc(p.wikiPublishedMonth) : " · effective date unknown") + "<br>Stops: supplied MTR data · " + esc(p.runningTimeSource ? "Running-time sources below." : "Running times: distance estimates") + "</p>" + (p.wikiInterval ? "<p>Wiki interval for this period: <b>" + esc(p.wikiInterval.raw) + " minutes</b></p>" : "") : ""}${p.runningTimeSource ? "<p><b>Running times:</b> " + (p.journeyTiming ? esc(p.runningTimeSource) : sourceLink(p.runningTimePlannerUrl || p.runningTimeSourceUrl, p.runningTimeSource)) + "</p>" : ""}${p.waitingExplanation ? "<p>" + esc(p.waitingExplanation) + "</p>" : ""}${p.intervalExplanation ? "<p>" + esc(p.intervalExplanation) + "</p>" : ""}${p.publishedIntervals?.length ? "<p><b>" + sourceLink("https://www.mtr.com.hk/en/customer/services/train_service_index.html", "Official MTR summary: " + p.line) + "</b></p><table><tbody>" + p.publishedIntervals.map((r) => "<tr><td>" + esc(r.period) + "</td><td>" + esc(r.minutes) + " min</td></tr>").join("") + "</tbody></table>" : ""}${p.headwayPolicy ? "<p>Current model policy: " + esc(p.headwayPolicy) + "</p>" : ""}${(p.warnings || []).map((w) => '<p class="source-warning">' + esc(w) + "</p>").join("")}${p.minimumTransferSeconds != null ? "<p><b>Feed transfer minimum: " + mins(p.minimumTransferSeconds) + "</b><br>" + esc(p.transferExplanation) + "</p>" : ""}${p.runningTimeSegments?.length ? "<details><summary>Running-time calculation for " + p.runningTimeSegments.length + " segments</summary>" + p.runningTimeSegments.map((s) => "<p><b>" + esc(s.key) + " · " + s.seconds + " seconds</b><br>" + (s.kind === "ASSUMPTION_distance_speed_model" ? esc(s.evidence.straight_line_metres) + " m straight line × " + esc(s.evidence.detour_factor) + " at " + esc(s.evidence.speed_kmh) + " km/h + " + esc(s.evidence.dwell_seconds) + " seconds; minimum 45 seconds." : ["OPERATOR_DERIVED_estimate", "MTR_API_CUMULATIVE"].includes(s.kind) ? sourceLink(s.evidence.planner_url || s.evidence.source_urls?.[0], s.kind === "MTR_API_CUMULATIVE" ? "MTR cached journey timing" : "MTR API-derived estimate") + " · " + esc(s.evidence.reason) : "Reviewed override: " + esc(s.evidence.source)) + "</p>").join("") + "</details>" : ""}</details>`;
 			}
+			function liveArrivalsHtml(p) {
+                return (p?.liveArrivals || []).map(o => {
+                    const query = new URLSearchParams({trip_id:o.tripId, stop_id:o.stopId, match:o.match, sequence:o.sequence});
+                    return `<div class="live-arrivals"><button type="button" data-arrivals="${esc(o.url + '?' + query)}">Live arrivals · ${esc(o.operator)}</button><p class="muted" role="status"></p></div>`;
+                }).join("");
+            }
+            document.addEventListener("click", async event => {
+                const button = event.target.closest("button[data-arrivals]");
+                if (!button) return;
+                const output = button.nextElementSibling;
+                button.disabled = true; output.textContent = "Checking official arrivals now…";
+                try {
+                    const response = await fetch(button.dataset.arrivals);
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || "Arrivals unavailable");
+                    output.textContent = result.departures?.length
+                        ? result.departures.map(d => `${d.clock}${d.kind === 'scheduled' ? ' (scheduled)' : ''}`).join(" · ") + " — arrivals now; planned route unchanged."
+                        : "No current arrivals available. Planned route unchanged.";
+                    if (result.warnings?.length) output.title = result.warnings.join(" ");
+                } catch (error) { output.textContent = "Live arrivals unavailable. Try again later."; }
+                finally { button.disabled = false; }
+            });
 			function sourceHtml(p) {
 				if (!p) return "<p>Source unavailable.</p>";
 				const type = p.sourceType,
@@ -1131,14 +1153,16 @@
 							? "Railway Wiki"
 							: rail
 								? "MTR + model"
-								: type === "operator" ? "Sun Ferry" : "Government GTFS";
+								: type === "operator" ? "Sun Ferry" : type === "official_gmb" ? "Official minibus API" : "Government GTFS";
 				const intervals = [
 					...new Set(
 						(p.feedIntervals || []).map((r) => r.headwaySeconds / 60),
 					),
 				];
 				const range =
-					p.timingModelKind === "conditional_envelope"
+					p.officialTimetable?.band?.headway_range_seconds?.[0] !== p.officialTimetable?.band?.headway_range_seconds?.[1]
+						? ` · published ${p.officialTimetable.band.headway_range_seconds.map(s => s / 60).join("–")} min; upper bound used`
+						: p.timingModelKind === "conditional_envelope"
 						? " · conditional estimate"
 						: ["range", "alternating"].includes(p.wikiInterval?.kind)
 							? ` · upper bound of ${esc(p.wikiInterval.raw)}`
@@ -1182,7 +1206,7 @@
 					? ""
 					: rail
 						? "Stops: MTR data · transfer buffer: estimate."
-						: type === "operator" ? p.runningTimeSource : "Stops & ride times: government GTFS; intermediate times may be estimated.";
+						: p.runningTimeSource || "Stops & ride times: government GTFS; intermediate times may be estimated.";
 				const status =
 					p.wikiStatus || (type === "wiki" ? "Wiki timetable applied." : "");
 				const freshness =
@@ -1195,7 +1219,7 @@
 					type === "experimental_rail"
 						? "Interval: conservative model, may overstate daytime waits."
 						: "";
-				return `<details class="provenance"><summary>Sources & estimates</summary><p><b>${walk ? "Map" : "Timetable"}:</b> ${sourceLink(p.sourceUrl, name)}<br>${timing}${corroboration}${rail ? "<br><b>Ride times:</b> " + rideSource : ""}${basis ? "<br>" + esc(basis) : ""}${p.boardingPlatform ? "<br><b>Platform:</b> " + esc(Array.isArray(p.boardingPlatform) ? p.boardingPlatform.join(" / ") : p.boardingPlatform) : ""}</p>${status ? "<p>" + esc(status) + "</p>" : ""}${freshness || fallback ? "<p>" + esc([freshness, fallback].filter(Boolean).join(" ")) + "</p>" : ""}${walk ? "" : '<p class="muted">Waits are modelled, not live arrivals.</p>'}${detailedSourceHtml(p).replace("Data source & timing assumptions", "More details")}</details>`;
+				return `<details class="provenance"><summary>Sources & estimates</summary><p><b>${walk ? "Map" : "Timetable"}:</b> ${sourceLink(p.sourceUrl, name)}<br>${timing}${corroboration}${rail ? "<br><b>Ride times:</b> " + rideSource : ""}${basis ? "<br>" + esc(basis) : ""}${p.geometrySource ? "<br><b>Route path:</b> " + sourceLink(p.geometrySourceUrl, "TD / CSDI") : ""}${p.verifiedIdentity?.length ? "<br><b>Service:</b> " + p.verifiedIdentity.map(m => sourceLink(m.sourceUrl, m.operator + " " + m.route + (m.serviceType ? " · variant " + m.serviceType : ""))).join(" / ") : ""}${p.boardingPlatform ? "<br><b>Platform:</b> " + esc(Array.isArray(p.boardingPlatform) ? p.boardingPlatform.join(" / ") : p.boardingPlatform) : ""}</p>${status ? "<p>" + esc(status) + "</p>" : ""}${freshness || fallback ? "<p>" + esc([freshness, fallback].filter(Boolean).join(" ")) + "</p>" : ""}${walk ? "" : '<p class="muted">Waits are modelled, not live arrivals.</p>'}${detailedSourceHtml(p).replace("Data source & timing assumptions", "More details")}</details>`;
 			}
 			function detailedOverallSources(s) {
 				if (!s)
@@ -1383,7 +1407,7 @@
 						: l.transitLeg
 							? "Timetable / interpolated estimate"
 							: "OSM walking estimate";
-					d.innerHTML = `<summary><span class="number">${i + 1}</span><span><strong>${esc(routeTitle(l))} · ${mins(l.duration)}</strong><small>${esc(l.from.name)} → ${esc(l.to.name)}</small></span></summary><div class="legcontent"><p><b>${timeOf(l.start.scheduledTime)} → ${timeOf(l.end.scheduledTime)}</b> · ${metres(l.distance)}<br><span class="muted">${estimate}</span></p>${l.headsign ? "<p>Direction: <b>" + esc(l.headsign) + "</b></p>" : ""}${l.from.stop?.platformCode ? "<p>Board at platform " + esc(l.from.stop.platformCode) + "</p>" : ""}${l.interlineWithPreviousLeg ? "<p>Stay on the same vehicle.</p>" : ""}${sourceHtml(l.provenance)}<div class="substeps"></div></div>`;
+					d.innerHTML = `<summary><span class="number">${i + 1}</span><span><strong>${esc(routeTitle(l))} · ${mins(l.duration)}</strong><small>${esc(l.from.name)} → ${esc(l.to.name)}</small></span></summary><div class="legcontent"><p><b>${timeOf(l.start.scheduledTime)} → ${timeOf(l.end.scheduledTime)}</b> · ${metres(l.distance)}<br><span class="muted">${estimate}</span></p>${l.headsign ? "<p>Direction: <b>" + esc(l.headsign) + "</b></p>" : ""}${l.from.stop?.platformCode ? "<p>Board at platform " + esc(l.from.stop.platformCode) + "</p>" : ""}${l.interlineWithPreviousLeg ? "<p>Stay on the same vehicle.</p>" : ""}${sourceHtml(l.provenance)}${liveArrivalsHtml(l.provenance)}<div class="substeps"></div></div>`;
 					d.querySelector("summary").addEventListener("click", () =>
 						focusLeg(i),
 					);

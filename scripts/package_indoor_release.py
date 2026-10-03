@@ -114,12 +114,14 @@ def package(root, target, output):
 		'scripts/indoor_timing.py',
 		'scripts/surface_timing.py', 'scripts/rebuild_surface.py', 'scripts/check_surface_feed.py',
 		'scripts/operator_sources.py', 'scripts/operator_timing.py', 'data/operators/report.json', 'docs/ROUTING_ACCURACY.md',
+		'scripts/enrich_transit.py', 'data/transit_enrichment/report.json', 'data/transit_enrichment/validation.json', 'docs/TRANSIT_ENRICHMENT.md',
 		'docs/SURFACE_TIMING.md', 'docs/TRANSIT_PROVIDERS.md', 'data/surface/report.json',
 		'data/mtr_api/inventory.json',
 		'docs/INDOOR_ROUTING.md', 'docs/INDOOR_VALIDATION.md', 'tools/gtfs-validator-8.0.1-cli.jar',
 	]
 	# All routing modules are one versioned engine, including optimizer and dependencies.
 	files += [p.relative_to(root).as_posix() for p in (root / 'route_checker').glob('*.py')]
+	files += [p.relative_to(root).as_posix() for p in (root / 'scripts/transit_enrichment').glob('*.py')]
 	files += ['route_checker/places.json', 'route_checker/multi_examples.json',
 		'data/landsd/places.geojson', 'data/generated/quality_report.json',
 		'data/user_inputs/otp/otp-shaded-2.9.0.jar',
@@ -127,7 +129,7 @@ def package(root, target, output):
 		'scripts/package_indoor_release.py', 'scripts/verify_routing_sync.py',
 		'scripts/templates/w8g_routing.py', 'docs/APP_ROUTING_SYNC.md']
 	files += [p.relative_to(root).as_posix() for p in (root / 'data/mtr_api/raw').glob('HR_*.json')]
-	for prefix in ('data/landsd/raw', 'data/landsd/indoor', 'data/surface/raw', 'data/operators/raw'):
+	for prefix in ('data/landsd/raw', 'data/landsd/indoor', 'data/surface/raw', 'data/operators/raw', 'data/transit_enrichment/raw'):
 		files += [p.relative_to(root).as_posix() for p in (root / prefix).rglob('*') if p.is_file() and not p.name.startswith('.') and not p.name.endswith('.part')]
 	files = sorted(set(files))
 	for name in files:

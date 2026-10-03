@@ -30,7 +30,8 @@ Multi-stop mode supports 1–100 jobs; this is not a production journey planner.
 - Search places or pick two points on the map; leave now or choose a departure time.
 - Compare up to **6 distinct routes**, ranked together with no transport quota. All six can be MTR via different stations. Choose earliest arrival, fewer transfers, or less walking; turn off **Show alternatives** for a quicker search. [Two-point API](docs/TWO_POINT_API.md).
 - Select MTR, buses/minibuses, ferries, Light Rail, Hong Kong Island trams, or funicular where the source feed supports them.
-- Follow an icon journey flow, highlight individual steps, and inspect timetable and ride-time sources.
+- Follow an icon journey flow, highlight individual steps, and inspect timetable and ride-time sources. Verified bus/minibus stops also offer official live arrivals.
+- Rebuild official minibus day/holiday schedules, verified service identities and checked historical timing proportions. [Source enrichment and limits](docs/TRANSIT_ENRICHMENT.md).
 
 ## Quick start
 
@@ -46,7 +47,7 @@ The script installs Python dependencies into `.venv` when needed, downloads the 
 
 Open **http://127.0.0.1:8000** when the terminal says it is ready. **Ctrl+C** stops the checker and its OTP process. Run the same command next time to start the verified existing build.
 
-**First run is substantial:** about 14,656 rail-pair requests, roughly 1,900 selected bus/minibus wiki articles, and five indoor-map layers for each of 98 MTR stations in the tested snapshot. Allow hours for a fresh collection; site delays and retries vary. Downloads and completed build stages are resumable. No API key is needed.
+**First run is substantial:** about 14,656 rail-pair requests, roughly 1,900 selected bus/minibus wiki articles, and five indoor-map layers for each of 98 MTR stations in the tested snapshot. Allow hours for a fresh collection; site delays and retries vary. The bus/minibus enrichment also collects about 10,000 small official responses and 168 historical hour/day files (about 150 MB). Downloads and completed build stages are resumable. No API key is needed.
 
 ## Use a source cache
 
@@ -78,7 +79,7 @@ python3 run.py check
 python3 run.py
 ```
 
-`build` reparses cached evidence with the latest builders, validates GTFS and rebuilds OTP. It includes the MTR non-peak change at Tseung Kwan O and LandsD enrichment. Missing sources are fetched. For the existing historical snapshot, use `python3 run.py build --offline --start-date 2026-09-17 --days 30` instead of the first command. [Rebuild details](docs/SETUP.md#rebuild-and-test).
+`build` reparses cached evidence with the latest builders, validates GTFS and rebuilds OTP. It includes MTR whole journeys, LandsD paths, CSDI route shapes and verified bus/minibus source enrichment. Missing sources are fetched. For the existing historical snapshot, use `python3 run.py build --offline --start-date 2026-09-17 --days 30` instead of the first command. [Rebuild details](docs/SETUP.md#rebuild-and-test).
 
 ## Know what the numbers mean
 

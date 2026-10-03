@@ -105,7 +105,20 @@ Installation uses the checksummed routing-release installer after stopping the
 native server; all replaced files are backed up. Restart the server yourself.
 Old saved routes remain snapshots; search again to get corrected timings/shapes.
 
-## Verified September 2026 build
+## October 2026 update
+
+The current pipeline validates **3,261** road shapes: 2,125 bus and 1,136
+minibus patterns. Preserving exactly connected source sections recovers 182
+previously rejected circular/repeated-road patterns, including all 63 N796
+stops. No previous shape match was lost. There remain 250 bus/minibus patterns
+without a validated road path, plus 106 ferry and 12 tram patterns.
+
+Official minibus timetable compilation now precedes surface interpolation;
+checked historical ETA proportions follow it. See [source enrichment and
+current counts](TRANSIT_ENRICHMENT.md). These timings remain estimates between
+protected published anchors.
+
+## Previous September 2026 build
 
 - 1,710,083 missing stop rows filled; 1,875,373 existing timed rows preserved.
 - All 1,666,541 MTR/Light Rail stop-time records preserved.

@@ -16,6 +16,12 @@ class SetupTests(unittest.TestCase):
 		self.assertFalse(run.allowed_cache('data/landsd/raw/script.py'))
 		self.assertFalse(run.allowed_cache('data/landsd/raw/unexpected.zip'))
 		self.assertFalse(run.allowed_cache('data/landsd/raw/../../outside.geojson'))
+	def test_transit_evidence_cache_includes_data_but_never_executable_code(self):
+		for name in ('history/source/eta.py.txt', 'identity/README.md.txt', 'published/ROUTE_BUS.xml', 'official/gmb-spec.pdf', 'history/times/all.json'):
+			self.assertTrue(run.allowed_cache('data/transit_enrichment/raw/' + name))
+		for name in ('history/source/eta.py', 'malicious.sh', '../../run.py'):
+			self.assertFalse(run.allowed_cache('data/transit_enrichment/raw/' + name))
+
 	def archive(self, path, files, hash_override=None):
 		meta = {
 			'format': 1,

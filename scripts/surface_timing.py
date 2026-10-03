@@ -18,7 +18,8 @@ import tempfile
 import zipfile
 
 DATASETS = {'bus': 'td_rcd_1638844988873_41214', 'gmb': 'td_rcd_1697082463580_57453'}
-MODEL = dict(version=1, method='distance_weighted_between_published_anchors',
+MODEL = dict(version=2, method='distance_weighted_between_published_anchors',
+	source_geometry='preserve_exactly_connected_source_part_order_else_connected_line_merge',
 	max_stop_offset_m=100, shape_simplification_m=1,
 	fallback='straight_line_distance_only_when_no_validated_route_path',
 	traffic='No live traffic adjustment', dwell='Included implicitly in published total duration')
@@ -70,11 +71,35 @@ def fetch(root, offline=False, refresh=False):
 	return manifest
 
 
+def connected_source_line(geometry):
+	"""Preserve source traversal order when multipart endpoints exactly agree.
+
+	Generic linemerge treats repeated road junctions as branches. A published
+	circular route can therefore become a MultiLineString even though its parts
+	already form one continuous ordered journey. Keep every traversal without
+	inventing any segment; unordered parts still use the connected-line fallback.
+	"""
+	from shapely.geometry import LineString
+	from shapely.ops import linemerge
+	if geometry.geom_type == 'LineString':
+		return geometry if not geometry.is_empty else None
+	if geometry.geom_type != 'MultiLineString' or geometry.is_empty:
+		return None
+	parts = [list(part.coords) for part in geometry.geoms]
+	if all(len(part) >= 2 for part in parts) and all(a[-1] == b[0] for a, b in zip(parts, parts[1:])):
+		coordinates = list(parts[0])
+		for part in parts[1:]:
+			coordinates.extend(part[1:])
+		return LineString(coordinates)
+	merged = linemerge(geometry)
+	return merged if merged.geom_type == 'LineString' and not merged.is_empty else None
+
+
 def source_lines(root):
 	"""Read pinned originals directly with GDAL; no geopandas dependency."""
 	from pyogrio.raw import read
 	from shapely import from_wkb
-	from shapely.ops import linemerge, transform
+	from shapely.ops import transform
 	from pyproj import Transformer
 	result = defaultdict(list)
 	for name in DATASETS:
@@ -88,10 +113,8 @@ def source_lines(root):
 		convert = Transformer.from_crs(meta['crs'], 'EPSG:2326', always_xy=True)
 		for i, raw in enumerate(geometries):
 			props = {field: values[j][i] for j, field in enumerate(meta['fields'])}
-			line = from_wkb(raw)
-			if line.geom_type == 'MultiLineString':
-				line = linemerge(line)
-			if line.geom_type != 'LineString':
+			line = connected_source_line(from_wkb(raw))
+			if line is None:
 				continue  # Do not invent bridges between disconnected source components.
 			line = transform(convert.transform, line).simplify(MODEL['shape_simplification_m'])
 			result[str(int(props['ROUTE_ID']))].append(dict(line=line, source=name,

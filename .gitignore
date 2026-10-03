@@ -43,3 +43,6 @@
 # Canonical authenticated-app adapter included in reproducible routing releases.
 !/scripts/templates/
 !/scripts/templates/w8g_routing.py
+
+!/scripts/transit_enrichment/
+!/scripts/transit_enrichment/*.py

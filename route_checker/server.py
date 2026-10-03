@@ -12,6 +12,8 @@ from pathlib import Path
 from transit_identity import enrich_leg
 from mtr_sections import rail_sections
 import route_selection
+import transit_provenance
+import transit_arrivals
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
@@ -129,6 +131,7 @@ def source_context():
 			odjourneys = api_proof.get('od_journeys', {})
 		surface = json.loads(z.read('surface_timing_provenance.json')) if 'surface_timing_provenance.json' in z.namelist() else {}
 		operators = json.loads(z.read('operator_timing_provenance.json')) if 'operator_timing_provenance.json' in z.namelist() else {}
+		enrichment = json.loads(z.read('transit_enrichment_provenance.json')) if 'transit_enrichment_provenance.json' in z.namelist() else {}
 		indoor = json.loads(z.read('indoor_provenance.json')) if 'indoor_provenance.json' in z.namelist() else {}
 		if 'transfers.txt' in z.namelist():
 			for r in csv.DictReader(
@@ -176,6 +179,7 @@ def source_context():
 		'indoor': indoor,
 		'surface': surface,
 		'operators': operators,
+		'enrichment': enrichment,
 	}
 	return _SOURCE_CONTEXT
 
@@ -369,6 +373,7 @@ def leg_provenance(leg, previous_transit=None):
 			item['geometrySourceUrl'] = surface['source_manifest'][surface_pattern['source']]['metadata_url']
 		else:
 			item['warnings'].append(surface_pattern['warning'])
+	transit_provenance.enrich(item, leg, context.get('enrichment', {}), tripid)
 	if rw:
 		item.update(
 			sourceName='Hong Kong Railway Wiki timetable + experimental rail running times',
@@ -617,7 +622,11 @@ def route_sources(pref):
 	return {
 		'engine': 'OTP 2.9, using the local experimental graph',
 		'datasetSnapshot': snapshot_date('td'),
+		'transitEnrichment': source_context().get('enrichment', {}).get('statistics', {}),
 		'documents': [
+			{'title': 'Official minibus timetables, stops and live arrivals', 'url': 'https://data.etagmb.gov.hk/static/GMB_ETA_API_Specification.pdf'},
+			{'title': 'Historical ETA-derived proportions (experimental)', 'url': 'https://github.com/HK-Bus-ETA/hk-bus-time-between-stops'},
+			{'title': 'Hong Kong public holiday calendar', 'url': 'https://www.1823.gov.hk/en/hong-kong-public-holidays-ical'},
 			{
 				'title': 'Rail wiki: 10 MTR lines, Light Rail and selected short services',
 				'url': 'https://hkrail.fandom.com/wiki/港鐵',
@@ -672,7 +681,7 @@ def route_sources(pref):
 			{
 				'name': 'Government intermediate stop times',
 				'value': 'About 88% of input arrival/departure fields are blank.',
-				'status': 'The builder preserves published timing points and fills intermediate times using verified route-path distances where available. These remain estimates, without live traffic.',
+				'status': 'The builder preserves published timing points and fills intermediate times using checked historical ETA proportions or route-path distances. These remain estimates, without live traffic.',
 			},
 		],
 		'firstWaitRule': 'Elapsed time runs from the requested departure to arrival, including time before leaving, the first boarding wait and later waits. Proposed departure and arrival are shown separately. Frequency waits are estimates after reaching the platform, not known departures that can be caught by leaving later.',
@@ -1237,7 +1246,17 @@ class Handler(BaseHTTPRequestHandler):
 		from urllib.parse import urlparse, parse_qs
 
 		url = urlparse(self.path)
+		if url.path == '/api/transit/arrivals':
+			try:
+				params = parse_qs(url.query)
+				match, visit = transit_provenance.resolve_arrival(source_context().get('enrichment', {}),
+					params.get('trip_id', [''])[0], int(params.get('match', ['0'])[0]),
+					params.get('stop_id', [''])[0], int(params.get('sequence', ['0'])[0]))
+				return self.send_json(transit_arrivals.fetch_arrivals(match, visit))
+			except (ValueError, TypeError, KeyError) as exc:
+				return self.send_json({'error': str(exc)}, 400)
 		if url.path.startswith('/api/indoor/'):
+
 			try:
 				return self.send_json(indoor_data(url.path))
 			except (KeyError, FileNotFoundError):
@@ -1270,6 +1289,7 @@ class Handler(BaseHTTPRequestHandler):
 			return self.send_json(
 				dict(
 					ready=ready,
+					transitEnrichment=source_context().get('enrichment', {}).get('statistics', {}),
 					railApiSegments=len(source_context().get('railapi', {})),
 					railWikiTrips=len(
 						source_context().get('railwiki', {}).get('trips', {})

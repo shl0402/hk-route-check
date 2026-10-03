@@ -18,8 +18,8 @@ The sequence is:
 1. Verify/download government GTFS, OSM, route metadata, MTR station inventories and service hours.
 2. Discover bus/minibus wiki directories; compare candidates with GTFS; cache selected articles. Scrape rail wiki lines and all ordered pairs within each rail system.
 3. Parse source evidence and audit route identities; retain original data for ambiguous or unsupported cases.
-4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment → cross-validated indoor station pathways → verified surface paths/timing anchors → verified Sun Ferry departures and journey ranges.
-5. Run the independent GTFS validator and rail merge checks, then build OTP once.
+4. Build base GTFS → accepted bus wiki schedules → rail wiki schedules → complete MTR origin/destination journeys (including service-note-backed same-line changes) → LandsD enrichment → cross-validated indoor station pathways → verified official minibus calendars/timetables → validated surface paths → checked historical ETA proportions between preserved timing anchors → verified Sun Ferry departures and journey ranges.
+5. Run the independent GTFS validator, calendar/timing preservation checks and rail merge checks, then build OTP once.
 6. Activate the successful feed and graph together; serve the Python API and HTML page.
 
 Build steps run in `data/build-work/`. A failed build does not replace the active graph. `data/setup-progress.json` records completed stages and output checksums. Rerunning verifies source/code fingerprints and reuses valid stages; a changed input reruns dependent work. Stop the app before replacing its active build. The wrapper refuses occupied ports rather than attaching to or killing another server.
@@ -135,6 +135,7 @@ OTP **2.9.0** and MobilityData validator **8.0.1** are downloaded from official 
 | `route_checker/server.py` | Local API, OTP integration and source explanations |
 | `route_checker/index.html` | Single-file HTML/CSS/JS checker |
 | `scripts/hkbus_pilot/` | Bus/minibus acquisition, matching and timetable merge |
+| `scripts/transit_enrichment/` | Official route/stop matching, GMB calendars, historical timing checks and source audit |
 | `scripts/hkrail/` | MTR and Light Rail wiki table adapters |
 | `scripts/*mtr*.py` | Typed API cache and whole-journey GTFS compilation |
 | `data/`, `tools/`, `.venv/` | Ignored local downloads, results and runtime |
@@ -156,3 +157,5 @@ published journey ranges. All 31 discovered KMB section pages are cached and
 checked; district predictions are retained as evidence, not invented stop-pair
 times. Cache export includes these source files. See [verified changes and
 remaining data limits](ROUTING_ACCURACY.md).
+
+The current pipeline also applies [bus/minibus source enrichment](TRANSIT_ENRICHMENT.md) before the final ferry stage. Verified GMB schedules are compiled before CSDI interpolation; accepted historical proportions are applied afterward. All supplied timing anchors remain protected. This stage is included in normal setup, offline rebuilds and cache export.

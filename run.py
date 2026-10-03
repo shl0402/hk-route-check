@@ -74,6 +74,7 @@ CACHE_PREFIX = (
 	'data/landsd/raw/',
 	'data/surface/raw/',
 	'data/operators/raw/',
+	'data/transit_enrichment/raw/',
 )
 
 
@@ -115,7 +116,8 @@ def allowed_cache(name):
 			name in CACHE_EXACT
 			or name.startswith(CACHE_PREFIX)
 			and (p.suffix in ('.json', '.html') or name.startswith('data/landsd/raw/') and p.suffix == '.geojson'
-				or name.startswith('data/operators/raw/') and p.suffix in ('.csv', '.pdf'))
+				or name.startswith('data/operators/raw/') and p.suffix in ('.csv', '.pdf')
+				or name.startswith('data/transit_enrichment/raw/') and p.suffix in ('.txt', '.pdf', '.xml'))
 		)
 	)
 
@@ -420,6 +422,8 @@ def fetch(a):
 	script('scripts/indoor_network.py', 'fetch', '--root', ROOT, *flags)
 	script('scripts/surface_timing.py', 'fetch', '--root', ROOT, *flags)
 	script('scripts/operator_sources.py', 'fetch', '--root', ROOT, *flags)
+	print('\n[Transit enrichment] Official routes, calendars, stops and historical timing evidence', flush=True)
+	script('scripts/enrich_transit.py', 'fetch', '--root', ROOT, *flags)
 	for path, (url, sha) in TOOLS.items():
 		download(path, url, a.offline, checksum=sha)
 	print(
@@ -571,7 +575,8 @@ def build(a):
 			gen / 'hk-transit-EXPERIMENTAL.gtfs.zip',
 		)
 		script('scripts/validate_gtfs.py', root=work)
-		script('scripts/check_surface_feed.py', gen / 'hk-transit-INDOOR.gtfs.zip', gen / 'hk-transit-SURFACE.gtfs.zip', root=work)
+		script('scripts/check_surface_feed.py', gen / 'hk-transit-ENRICHED-BASE.gtfs.zip', gen / 'hk-transit-SURFACE.gtfs.zip', root=work)
+		script('scripts/enrich_transit.py', 'verify', '--root', work, root=work)
 		script('scripts/hkbus_pilot/check_merge.py', root=work)
 		script('scripts/hkrail/check_merge.py', root=work)
 
@@ -605,8 +610,10 @@ def build(a):
 		),
 		('08-landsd', lambda: script('scripts/landsd_enrich.py', 'merge', '--root', work, root=work), gen / 'hk-transit-LANDSD.gtfs.zip'),
 		('08b-indoor', lambda: script('scripts/indoor_network.py', 'compile', '--root', work, root=work), gen / 'hk-transit-INDOOR.gtfs.zip'),
-		('08c-surface-timing', lambda: script('scripts/surface_timing.py', 'merge', '--root', work, root=work), gen / 'hk-transit-SURFACE.gtfs.zip'),
-		('08d-operator-timetables', lambda: script('scripts/operator_timing.py', '--root', work, root=work), gen / 'hk-transit-OPERATOR.gtfs.zip'),
+		('08ba-official-transit', lambda: script('scripts/enrich_transit.py', 'base', '--root', work, '--start', a.start_date, '--end', str(end), root=work), gen / 'hk-transit-ENRICHED-BASE.gtfs.zip'),
+		('08c-surface-timing', lambda: script('scripts/surface_timing.py', 'merge', '--root', work, '--input', gen / 'hk-transit-ENRICHED-BASE.gtfs.zip', root=work), gen / 'hk-transit-SURFACE.gtfs.zip'),
+		('08ca-transit-timing', lambda: script('scripts/enrich_transit.py', 'timing', '--root', work, root=work), gen / 'hk-transit-ENRICHED.gtfs.zip'),
+		('08d-operator-timetables', lambda: script('scripts/operator_timing.py', '--root', work, '--base', gen / 'hk-transit-ENRICHED.gtfs.zip', root=work), gen / 'hk-transit-OPERATOR.gtfs.zip'),
 		('09-validate', validate, gen / 'validator/report.json'),
 		('10-otp-graph', graph_build, graph / 'graph.obj'),
 	]
@@ -659,6 +666,10 @@ def build(a):
 		'landsd/RESULTS.md',
 		'surface/report.json',
 		'operators/report.json',
+		'transit_enrichment/report.json',
+		'transit_enrichment/base_report.json',
+		'transit_enrichment/base_validation.json',
+		'transit_enrichment/validation.json',
 	):
 		if (work / 'data' / name).exists():
 			dest = ROOT / 'data' / name
@@ -680,6 +691,7 @@ def build(a):
 		'validation_errors': 0,
 		'indoor_validation_sha256': digest(ROOT / 'data/landsd/indoor/validation.json'),
 		'surface_report_sha256': digest(ROOT / 'data/surface/report.json'),
+		'transit_enrichment_report_sha256': digest(ROOT / 'data/transit_enrichment/report.json'),
 		'operator_report_sha256': digest(ROOT / 'data/operators/report.json'),
 		'source_manifest': read(ROOT / 'data/source_manifest.json'),
 	}
@@ -701,6 +713,8 @@ def check_build():
 			raise ValueError(f'Built artifact changed: {path}; rebuild before serving.')
 	if m.get('surface_report_sha256') and digest(ROOT / 'data/surface/report.json') != m['surface_report_sha256']:
 		raise ValueError('Surface timing report does not match the active release')
+	if m.get('transit_enrichment_report_sha256') and digest(ROOT / 'data/transit_enrichment/report.json') != m['transit_enrichment_report_sha256']:
+		raise ValueError('Transit enrichment report does not match the active release')
 	if m.get('operator_report_sha256') and digest(ROOT / 'data/operators/report.json') != m['operator_report_sha256']:
 		raise ValueError('Operator timetable report does not match the active release')
 	if m.get('indoor_validation_sha256') and digest(ROOT / 'data/landsd/indoor/validation.json') != m['indoor_validation_sha256']:
@@ -789,6 +803,8 @@ def main():
 					indent=2,
 				),
 			)
+		print('Verified official transit responses:', len(read(ROOT / 'data/transit_enrichment/raw/official/manifest.json', {})))
+		print('Transit enrichment:', json.dumps(read(ROOT / 'data/transit_enrichment/report.json', {}).get('statistics', {'status': 'not built'}), ensure_ascii=False))
 		return
 	# Single writer, including import/export. A crash releases the OS lock automatically.
 	import fcntl

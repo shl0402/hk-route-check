@@ -2,10 +2,10 @@
 from pathlib import Path
 import sys
 import unittest
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from surface_timing import interpolate, match_line
+from surface_timing import interpolate, match_line, connected_source_line
 
 
 def row(time='', departure=None):
@@ -56,6 +56,33 @@ class SurfaceTimingTests(unittest.TestCase):
 	def test_reverse_digitized_line_is_oriented_to_stops(self):
 		line = LineString([(1000, 0), (0, 0)])
 		self.assertEqual(match_line(line, [(0, 0), (400, 0), (1000, 0)], 10)['distances'], [0, 400, 1000])
+
+	def test_source_parts_keep_repeated_road_traversal(self):
+		parts = MultiLineString([[(0, 0), (100, 0)], [(100, 0), (200, 0)],
+			[(200, 0), (100, 0)], [(100, 0), (0, 0)]])
+		line = connected_source_line(parts)
+		self.assertEqual(list(line.coords), [(0, 0), (100, 0), (200, 0), (100, 0), (0, 0)])
+		self.assertEqual(line.length, sum(part.length for part in parts.geoms))
+		fit = match_line(line, [(0, 0), (200, 0), (0, 0)], 1)
+		self.assertEqual(fit['distances'], [0, 200, 400])
+
+	def test_disconnected_parts_are_not_bridged(self):
+		parts = MultiLineString([[(0, 0), (100, 0)], [(101, 0), (200, 0)]])
+		self.assertIsNone(connected_source_line(parts))
+
+	def test_unordered_but_connected_parts_can_still_merge(self):
+		parts = MultiLineString([[(100, 0), (200, 0)], [(0, 0), (100, 0)]])
+		line = connected_source_line(parts)
+		self.assertEqual(line.length, 200)
+		self.assertEqual(match_line(line, [(0, 0), (100, 0), (200, 0)], 1)['distances'], [0, 100, 200])
+
+	def test_unordered_branch_is_not_invented_as_a_traversal(self):
+		parts = MultiLineString([[(0, 0), (100, 0)], [(100, 0), (200, 0)], [(100, 0), (100, 100)]])
+		self.assertIsNone(connected_source_line(parts))
+
+	def test_source_gap_smaller_than_one_metre_is_still_a_gap(self):
+		parts = MultiLineString([[(0, 0), (100, 0)], [(100.000001, 0), (200, 0)]])
+		self.assertIsNone(connected_source_line(parts))
 
 
 if __name__ == '__main__':

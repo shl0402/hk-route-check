@@ -57,7 +57,7 @@ Evidence: `data/operators/raw/manifest.json`, `normalized.json`, `report.json`, 
 
 ## Remaining data limits
 
-- Bus/minibus intermediate times still use published timing anchors plus path-distance interpolation. Official CSDI geometry already covers 3,079 matched patterns; unmatched paths retain explicit fallback labels. No complete measured future stop-pair timing table was verified.
+- Bus/minibus intermediate times use published timing anchors plus checked historical ETA proportions where accepted, with path-distance interpolation elsewhere. See [3 October source enrichment](TRANSIT_ENRICHMENT.md). Official CSDI geometry covers 3,261 matched patterns; unmatched paths retain explicit fallback labels. No complete measured future stop-pair timing table was verified.
 - MTR whole-journey values are operator estimates. Their hidden waiting allowance is not separately identified; the visible first boarding wait remains a separate model value. OTP 2.9 frequency routing uses a full interval for `exact_times=0`; these are not live predictions.
 - Walking and lift timings remain models. Published indoor geometry does not supply measured walking times; outdoor LandsD paths cannot be merged by proximity without checking connectivity and access restrictions.
 - Rail/tram/ferry map paths without verified GTFS shapes can still join known stops. No invented track alignment is presented as source geometry.
