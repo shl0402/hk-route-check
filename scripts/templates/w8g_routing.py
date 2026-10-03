@@ -25,6 +25,21 @@ def init(port):
 	manager = optimizer.Manager(router)
 
 
+def stop_stays(d):
+	"""Minutes attached to requested places, retained if the solver reorders them."""
+	def checked(value):
+		if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 720:
+			raise ValueError("Stay time must be a whole number of minutes from 0 to 720.")
+		return value
+	default = checked(d.get("defaultStayMinutes", 0))
+	count = len(d["stops"])
+	overrides = d.get("stopStayMinutes")
+	if overrides is not None and (not isinstance(overrides, list) or len(overrides) != count):
+		raise ValueError("Provide one stay-time entry per stop.")
+	return [checked(overrides[i]) if overrides is not None and overrides[i] is not None
+		else (default if 0 < i < count - 1 else 0) for i in range(count)]
+
+
 def validate(d):
 	if not isinstance(d.get("includeAlternatives", True), bool):
 		raise ValueError("includeAlternatives must be true or false.")
